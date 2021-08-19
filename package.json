@@ -1,0 +1,16 @@
+{
+  "name": "node-socket-log-server",
+  "version": "1.0.0",
+  "description": "A lightweight network logger with a simple UI using sockets as a transport and redis as a store",
+  "main": "index.js",
+  "repository": "https://github.com/McDuckes/node-socket-log-server.git",
+  "author": "Robert Gudat",
+  "license": "MIT",
+  "dependencies": {
+    "@types/redis": "^2.8.31",
+    "redis": "^3.1.2",
+    "tsc-hooks": "^1.0.9-dev.20210715.1",
+    "typescript": "^4.3.5",
+    "uWebSockets.js": "uNetworking/uWebSockets.js#v19.3.0"
+  }
+}
