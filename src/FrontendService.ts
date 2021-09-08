@@ -7,24 +7,24 @@ import { RedisClient } from 'redis';
 import getRedisInstance from './Redis';
 import * as fs from "fs";
 
-export default class FrontEndcontroller extends HasApp{
+export default class FrontEndcontroller extends HasApp {
 
-    redis : RedisClient;
+    redis: RedisClient;
 
-    constructor(){
+    constructor() {
         super();
         new CleanUpService();
-        this.bind('post', '/search',this.search);
-        this.bind('get', '/app',this.loadApp);
+        this.bind('post', '/search', this.search);
+        this.bind('get', '/app', this.loadApp);
         this.startListening();
         this.redis = getRedisInstance();
     }
 
-    bind(method : 'post' | 'get', routePattern : string, handler: (request : RequestData, response : HttpResponse) => void) {
+    bind(method: 'post' | 'get', routePattern: string, handler: (request: RequestData, response: HttpResponse) => void) {
         this.app[method](routePattern, (response, request) => {
-            response.onAborted(() => {});
+            response.onAborted(() => { });
 
-            let headers : Dictionary<string> = {};
+            let headers: Dictionary<string> = {};
 
             request.forEach((headerKey, headerValue) => {
                 headers[headerKey] = headerValue;
@@ -34,25 +34,25 @@ export default class FrontEndcontroller extends HasApp{
             response.onData(async (data: ArrayBuffer, isLast: boolean) => {
                 body += data;
                 if (isLast) {
-                    handler(new RequestData(headers, body),response);
+                    handler(new RequestData(headers, body), response);
                 }
             });
         });
     }
 
-    loadApp(request : RequestData, response: HttpResponse){
-        fs.readFile('./vue/app.html',(err,data) => {
-            if(err){
+    loadApp(request: RequestData, response: HttpResponse) {
+        fs.readFile('./frontend/app.html', (err, data) => {
+            if (err) {
                 response.end('Sorry, something went wrong while loading the app.');
                 console.log(err);
-            }else{
+            } else {
                 response.end(data);
             }
         });
     }
 
-    search(request : RequestData, response: HttpResponse){
-        try{
+    search(request: RequestData, response: HttpResponse) {
+        try {
             let parameters = JSON.parse(request.data);
             let searchTerm = parameters.searchTerm ?? '';
             let intervalStart = parameters.intervalStart ?? 0;
@@ -62,10 +62,10 @@ export default class FrontEndcontroller extends HasApp{
             let minimumSeverity = parameters.page ?? 0;
             let maximumSeverity = parameters.page ?? 10;
 
-            if(searchTerm === '' || (intervalStart == 0 && intervalEnd == 0) || intervalStart < intervalEnd
-            || page < 0 || pageSize < 0 || pageSize > 250 || minimumSeverity > maximumSeverity){
+            if (searchTerm === '' || (intervalStart == 0 && intervalEnd == 0) || intervalStart < intervalEnd
+                || page < 0 || pageSize < 0 || pageSize > 250 || minimumSeverity > maximumSeverity) {
                 response.writeStatus('400 Bad Request');
-                response.end('Parameters are not within acceptable ranges: '+JSON.stringify({
+                response.end('Parameters are not within acceptable ranges: ' + JSON.stringify({
                     searchTerm,
                     intervalStart,
                     intervalEnd,
@@ -74,25 +74,25 @@ export default class FrontEndcontroller extends HasApp{
                     minimumSeverity,
                     maximumSeverity
                 }));
-            }else{
+            } else {
                 let entryCount = 0;
                 let data = [];
                 let pageStart = page * pageSize;
                 let pageEnd = pageStart + pageSize;
 
-                this.redis.keys('log:*',(err : Error, reply : string[]) => {
-                    if(!err){
+                this.redis.keys('log:*', (err: Error, reply: string[]) => {
+                    if (!err) {
                         reply.sort().reverse();
                         reply.some((setKey) => {
-                            let time = Number.parseInt(setKey.substr(4,13));
-                            if (time < Date.now() - intervalEnd * 60000 && time > Date.now() - intervalStart * 60000){
+                            let time = Number.parseInt(setKey.substr(4, 13));
+                            if (time < Date.now() - intervalEnd * 60000 && time > Date.now() - intervalStart * 60000) {
                                 this.redis.smembers(setKey, (err, reply) => {
-                                    if(!err){
+                                    if (!err) {
                                         reply.some((message) => {
-                                            if(message.includes(searchTerm)){
+                                            if (message.includes(searchTerm)) {
                                                 let info = JSON.parse(message);
-                                                if(info.severity >= minimumSeverity && info.severity <= maximumSeverity){
-                                                    if(entryCount >= pageStart && entryCount < pageEnd){
+                                                if (info.severity >= minimumSeverity && info.severity <= maximumSeverity) {
+                                                    if (entryCount >= pageStart && entryCount < pageEnd) {
                                                         data.push(message);
                                                     }
                                                     entryCount++;
@@ -105,14 +105,14 @@ export default class FrontEndcontroller extends HasApp{
                             }
                             return entryCount >= pageEnd;
                         });
-                    }else {
+                    } else {
                         console.log(err);
                     }
                     response.writeStatus('200 OK');
                     response.end(JSON.stringify(data));
                 });
             }
-        }catch(err){
+        } catch (err) {
             response.writeStatus('500 Internal Server Error');
             response.end(JSON.stringify(err));
         }

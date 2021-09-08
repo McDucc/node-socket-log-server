@@ -6,43 +6,117 @@
         integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
 </head>
 
-<body x-data="{ autoUpdate: false }">
-    <div class="row col-md-11 mt-4" style="margin: auto;">
-        <a style="font-size: xx-large;">&#x1f9e6; SockLog</a>
-    </div>
-    <div class="bd-example row col-md-11 mt-4" style="margin: auto;">
-        <div class="row mt-2">
-            <div class="col-md-2">
-            <button class="btn btn-primary form-control "x-on:click="authenticate()">Authenticate</button>
+<body x-data="{ autoUpdate: true, timeframe_type: 0, authenticated:0 }"
+    style="background-color: #19222b; color: #dee2e6;">
+    <div class="col-md-11 mt-3" style="margin: auto; "><a
+            style="font-size: xx-large; font-weight: bold; color: #0d5dd6;">Socket</a><a
+            style="font-size: xx-large; font-weight: bold;">Logger</a>
+        <div class="bd-example row col-md-12 mt-4" style="margin: auto;">
+            <div class="row mt-2">
+                <div class="col-md-12">
+                    <button class="alert btn btn-primary" style="float: left;" x-on:click="authenticate()">Authenticate
+                    </button>
+                    <div class="alert alert-danger ms-4" style="float: left;" x-show="authenticated == 1">Supplied
+                        credentials seem to be incorrect.
+                    </div>
+                    <div class="alert alert-dark ms-4 alm" style="float: left;" x-show="authenticated == 2">
+                        Authenticated successfully.</div>
+                </div>
+            </div>
+            <div class=" row mt-2">
+                <div class="col-md-3">
+                    <p>Search Term:</p>
+                    <input class="form-control" type="text">
+                    <button class="btn btn-primary form-control mt-2" x-bind:disabled="autoUpdate">Search</button>
+                </div>
+                <div class="col-md-3">
+                    <p>Update Speed:</p>
+                    <select class="form-control mt-2">
+                        <option value="5">5 seconds</option>
+                        <option value="10" selected>10 seconds</option>
+                        <option value="15">15 seconds</option>
+                        <option value="30">30 seconds</option>
+                        <option value="60">1 minute</option>
+                    </select>
+                    <button class="btn btn-primary form-control mt-2" x-on:click="autoUpdate = !autoUpdate"
+                        x-show="autoUpdate">Auto-Update active</button>
+                    <button class="btn btn-secondary form-control mt-2" x-on:click="autoUpdate = !autoUpdate"
+                        x-show="!autoUpdate">Auto-Update stopped</button>
+                </div>
+                <div class="col-md-3">
+                    <p>Timeframe-Type:</p>
+                    <select x-model="timeframe_type" class="form-control mt-2">
+                        <option value="0" selected>Messages since</option>
+                        <option value="1">Messages within Timeframe</option>
+                    </select>
+                    <div x-show="timeframe_type == 0">
+                        <select class="form-control mt-2">
+                            <option value="1" selected>1 minute</option>
+                            <option value="2">2 minutes</option>
+                            <option value="5">5 minutes</option>
+                            <option value="10">10 minutes</option>
+                            <option value="15">15 minutes</option>
+                            <option value="30">30 minutes</option>
+                            <option value="60">1 hour</option>
+                            <option value="120">2 hours</option>
+                            <option value="240">4 hours</option>
+                            <option value="480">8 hours</option>
+                            <option value="999">All time</option>
+                        </select>
+                    </div>
+                    <div x-show="timeframe_type == 1">
+                        <input class="form-control" type="datetime-local" value="2015-01-02T11:42:13">
+                        <input class="form-control" type="datetime-local" value="2015-01-02T11:42:13">
+                    </div>
+                </div>
+                <div class="col-md-3"
+                    x-data="{ servers: [{name: 'server1', ping: 12}, {name: 'server2', ping: 22}, {name: 'server3', ping: 15}, {name: 'server3', ping: 15}, {name: 'server3', ping: 15}, {name: 'server3', ping: 15}] }">
+                    <p>Filter by Server:</p>
+                    <select class="form-control mt-2" multiple>
+                        <template x-for="server in servers">
+                            <option x-bind:value="server.name" x-text="server.name"></option>
+                        </template>
+                    </select>
+                </div>
+            </div>
         </div>
+        <div class="bd-example row col-md-12 mt-4" style="margin: auto; font-size: 15px; font-family: monospace;">
+            <div class="btn btn-primary alx">
+                &lt;
+            </div>
+            <div class="btn btn-primary alx">
+                1
+            </div>
+            <div class="btn btn-primary alx">
+                ...
+            </div>
+            <div class="btn btn-primary alx">
+                12
+            </div>
+            <div class="btn btn-primary alx">
+                ...
+            </div>
+            <div class="btn btn-primary alx">
+                23
+            </div>
+            <div class="btn btn-primary alx">
+                &gt;
+            </div>
+            <div class="alert alert-dark alm">
+                <b>Datetime:</b> 2021-08-01 00:00:00.333<br>
+                <b>Message:</b> Example Message Example Message<br>
+                <b>Level:</b> Info<br>
+                <b>Server:</b> Server 4<br>
+                <b>Data:</b><br> Example Message Example Message<br>
+            </div>
+            <div class="alert alert-danger">
+                <b>Datetime:</b> 2021-08-01 00:00:00.333<br>
+                <b>Message:</b> Example Message Example Message<br>
+                <b>Level:</b> Critical<br>
+                <b>Server:</b> Server 4<br>
+                <b>Data:</b><br> Example Message Example Message<br>
+            </div>
         </div>
-        <div class="row">
-        <div class="col-md-4">
-            <p>Search Term:</p>
-            <input class="form-control" type="text">
-            <button class="btn btn-primary form-control mt-2">Search</button>
-        </div>
-        <div class="col-md-4">
-            <p>Update Speed:</p>
-            <select class="form-control mt-2">
-                <option value="5">5 seconds</option>
-                <option value="10" selected>10 seconds</option>
-                <option value="15">15 seconds</option>
-                <option value="30">30 seconds</option>
-                <option value="60">1 minute</option>
-            </select>
-            <button class="btn btn-primary form-control mt-2"x-on:click="autoUpdate = !autoUpdate" x-show="autoUpdate">Auto-Update active</button>
-            <button class="btn btn-secondary form-control mt-2"x-on:click="autoUpdate = !autoUpdate" x-show="!autoUpdate">Auto-Update stopped</button>
-        </div>
-        <div class="col-md-4" x-data="{ servers: [{name: 'server1', ping: 12}, {name: 'server2', ping: 22}, {name: 'server3', ping: 15}, {name: 'server3', ping: 15}, {name: 'server3', ping: 15}, {name: 'server3', ping: 15}] }">
-            <p>Filter by Server:</p>
-            <select class="form-control mt-2" multiple>
-                <template x-for="server in servers">
-                    <option x-bind:value="server.name" x-text="server.name"></option>
-                </template>
-            </select>
-        </div>
-    </div>
     </div>
     <script>
         function authenticate() {
@@ -50,6 +124,27 @@
         }
     </script>
     <style>
+        .btn-primary {
+            background-color: #07429b;
+            border-color: #07429b;
+        }
+
+        .alert-danger {
+            color: #dee2e6;
+            background-color: #80343a;
+        }
+
+        .alm {
+            background-color: #414549;
+            color: #dee2e6;
+        }
+
+        .alx {
+            background-color: #07429b;
+            color: #dee2e6;
+            width: auto !important;
+            margin-bottom: 2em !important;
+        }
 
         .bd-example {
             position: relative;
