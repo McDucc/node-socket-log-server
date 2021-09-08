@@ -1,5 +1,5 @@
 import RequestData from './RequestData';
-import { App, TemplatedApp, HttpResponse } from "uWebSockets.js";
+import { HttpResponse } from "uWebSockets.js";
 import { Dictionary } from "./RequestData";
 import HasApp from './HasApp';
 import CleanUpService from './CleanUpService';

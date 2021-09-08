@@ -1,6 +1,7 @@
 import HasApp from './HasApp';
 import { RedisClient } from 'redis';
 import getRedisInstance from './Redis';
+import { env } from '../env';
 
 export default class LoggerWebservice extends HasApp{
 

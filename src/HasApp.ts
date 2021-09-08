@@ -1,4 +1,5 @@
 import { TemplatedApp, App } from 'uWebSockets.js';
+import { env } from '../env';
 
 export default class HasApp{
 

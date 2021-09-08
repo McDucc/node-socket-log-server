@@ -1,4 +1,5 @@
 import getRedisInstance from './Redis';
+import { env } from '../env';
 
 export default class CleanUpService{
 
