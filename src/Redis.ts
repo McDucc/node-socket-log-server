@@ -1,7 +1,7 @@
-import { RedisClient } from "redis";
 import { env } from '../env';
+import { RedisClient } from "redis";
 
-export default function getRedisInstance() : RedisClient{
+export default function getRedisInstance(): RedisClient {
     return new RedisClient({
         path: env.redis_path,
         host: env.redis_host,
