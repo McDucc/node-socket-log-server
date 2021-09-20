@@ -41,7 +41,7 @@ export default class FrontEndcontroller extends HasApp {
     }
 
     loadApp(request: RequestData, response: HttpResponse) {
-        fs.readFile('./frontend/app.html', (err, data) => {
+        fs.readFile('./src/frontend/app.html', (err, data) => {
             if (err) {
                 response.end('Sorry, something went wrong while loading the app.');
                 console.log(err);
@@ -76,15 +76,15 @@ export default class FrontEndcontroller extends HasApp {
                 }));
             } else {
                 let entryCount = 0;
-                let data = [];
+                let data: string[] = [];
                 let pageStart = page * pageSize;
                 let pageEnd = pageStart + pageSize;
 
-                this.redis.keys('log:*', (err: Error, reply: string[]) => {
+                this.redis.keys('log:*', (err, reply: string[]) => {
                     if (!err) {
                         reply.sort().reverse();
                         reply.some((setKey) => {
-                            let time = Number.parseInt(setKey.substr(4, 13));
+                            let time = Number.parseInt(setKey.substring(4, 13));
                             if (time < Date.now() - intervalEnd * 60000 && time > Date.now() - intervalStart * 60000) {
                                 this.redis.smembers(setKey, (err, reply) => {
                                     if (!err) {

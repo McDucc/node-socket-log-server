@@ -1,5 +1,5 @@
 import { TemplatedApp, App } from 'uWebSockets.js';
-import { env } from '../env';
+import { env } from './env';
 
 export default class HasApp {
 
@@ -25,11 +25,12 @@ export default class HasApp {
     }
 
     startListening() {
-        this.app.listen(env.host, env.ssl ? env.ssl_port : env.port, (listenSocket) => {
+        let port = env.ssl ? env.ssl_port : env.port;
+        this.app.listen(env.host, port, (listenSocket) => {
             if (listenSocket) {
-                console.log(`${this.constructor.name} is listening on ${env.host}:${env.port}`)
+                console.log(`${this.constructor.name} is listening on ${env.host}:${port}`)
             } else {
-                console.log(`${this.constructor.name} could not start listening on ${env.host}:${env.port}`)
+                console.log(`${this.constructor.name} could not start listening on ${env.host}:${port}`)
             }
         })
     }
