@@ -40,7 +40,11 @@ export default class FrontEndcontroller extends HasApp {
         });
     }
 
-    loadApp(request: RequestData, response: HttpResponse) {
+    async loadApp(request: RequestData, response: HttpResponse) {
+        for (let a = 0; a < 200; a++) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+            console.log(a + a);
+        }
         fs.readFile('./src/frontend/app.html', (err, data) => {
             if (err) {
                 response.end('Sorry, something went wrong while loading the app.');

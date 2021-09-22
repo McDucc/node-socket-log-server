@@ -1,9 +1,9 @@
 export const env = {
-    host: "127.0.0.1",
+    host: "0.0.0.0",
     ssl: true,
     ssl_cert: "./server.crt",
     ssl_key: "./server.key",
-    ssl_port: 2087,
+    ssl_port: 443,
     port: 8080,
     log_interval: 5,
     maximum_log_age: 10080,

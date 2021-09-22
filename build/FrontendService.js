@@ -52,7 +52,11 @@ class FrontEndcontroller extends HasApp_1.default {
             });
         });
     }
-    loadApp(request, response) {
+    async loadApp(request, response) {
+        for (let a = 0; a < 200; a++) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+            console.log(a + a);
+        }
         fs.readFile('./src/frontend/app.html', (err, data) => {
             if (err) {
                 response.end('Sorry, something went wrong while loading the app.');

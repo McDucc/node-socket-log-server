@@ -8,11 +8,7 @@ class HasApp {
             console.log(err);
             process.exit(1);
         });
-        this.app = uWebSockets_js_1.App(env_1.env.ssl ?
-            {
-                cert_file_name: env_1.env.ssl_cert,
-                key_file_name: env_1.env.ssl_key
-            } : {});
+        this.app = uWebSockets_js_1.App({});
     }
     startListening() {
         let port = env_1.env.ssl ? env_1.env.ssl_port : env_1.env.port;

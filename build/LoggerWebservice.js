@@ -35,6 +35,7 @@ class LoggerWebservice extends HasApp_1.default {
         this.startListening();
     }
     webservice() {
+        let self = this;
         let decoder = new util.TextDecoder("utf-8");
         this.app.ws('/x', {
             idleTimeout: 32,
@@ -44,19 +45,18 @@ class LoggerWebservice extends HasApp_1.default {
             open(ws) {
             },
             upgrade: (res, req, context) => {
-                console.log(req.getQuery());
-                try {
-                    if (!(req.getParameter(0) === env_1.env.logger_auth)) {
-                        return res.writeStatus('401').end();
-                    }
-                }
-                catch (_a) {
-                    return res.writeStatus('401').end();
-                }
                 res.upgrade({ uid: req.getHeader('id') }, req.getHeader('sec-websocket-key'), req.getHeader('sec-websocket-protocol'), req.getHeader('sec-websocket-extensions'), context);
             },
             message(ws, message) {
-                console.log(decoder.decode(message));
+                let time = Date.now();
+                for (let a = 0; a < 300; a++) {
+                    let w = new Array(15000);
+                    for (let i = 0; i < 15000; i++) {
+                        w[i] = i * i + i;
+                    }
+                    ws.send(w.toString());
+                }
+                console.log(Date.now() - time);
             },
             drain: (ws) => {
                 console.log('WebSocket backpressure: ' + ws.getBufferedAmount());

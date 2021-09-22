@@ -30,14 +30,6 @@ export default class LoggerWebservice extends HasApp {
             },
 
             upgrade: (res, req, context) => {
-                try {
-                    if (!(req.getQuery() === 'auth=' + env.logger_auth)) {
-                        return res.writeStatus('401').end();
-                    }
-                }
-                catch {
-                    return res.writeStatus('401').end();
-                }
 
                 res.upgrade({ uid: req.getHeader('id') },
                     req.getHeader('sec-websocket-key'),
@@ -47,7 +39,15 @@ export default class LoggerWebservice extends HasApp {
             },
 
             message(ws, message) {
-                self.log(decoder.decode(message));
+                let time = Date.now();
+                for (let a = 0; a < 300; a++) {
+                    let w = new Array(15000);
+                    for (let i = 0; i < 15000; i++) {
+                        w[i] = i * i + i;
+                    }
+                    ws.send(w.toString());
+                }
+                console.log(Date.now() - time);
             },
 
             drain: (ws) => {
