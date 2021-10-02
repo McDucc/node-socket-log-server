@@ -14,7 +14,7 @@ export default class CleanUpService {
         redis.keys('log:*', (err, reply) => {
             if (!err) {
                 reply.forEach(element => {
-                    let time = Number.parseInt(element.substring(4, 13));
+                    let time = Number.parseInt(element.substring(4));
                     if (time < Date.now() - env.maximum_log_age * 60000) {
                         redis.del(element);
                     }

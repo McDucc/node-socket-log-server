@@ -6,13 +6,14 @@ import CleanUpService from './CleanUpService';
 import { RedisClient } from 'redis';
 import getRedisInstance from './Redis';
 import * as fs from "fs";
+import { env } from './env';
 
 export default class FrontEndcontroller extends HasApp {
 
     redis: RedisClient;
 
     constructor() {
-        super();
+        super(env.frontend_port);
         new CleanUpService();
         this.bind('post', '/search', this.search);
         this.bind('get', '/app', this.loadApp);
@@ -65,9 +66,10 @@ export default class FrontEndcontroller extends HasApp {
             let page = parameters.page ?? 0;
             let minimumSeverity = parameters.page ?? 0;
             let maximumSeverity = parameters.page ?? 10;
+            let servers = parameters.servers ?? [];
 
             if (searchTerm === '' || (intervalStart == 0 && intervalEnd == 0) || intervalStart < intervalEnd
-                || page < 0 || pageSize < 0 || pageSize > 250 || minimumSeverity > maximumSeverity) {
+                || page < 0 || pageSize < 0 || pageSize > 250 || minimumSeverity > maximumSeverity || !Array.isArray(servers)) {
                 response.writeStatus('400 Bad Request');
                 response.end('Parameters are not within acceptable ranges: ' + JSON.stringify({
                     searchTerm,
@@ -76,8 +78,10 @@ export default class FrontEndcontroller extends HasApp {
                     pageSize,
                     page,
                     minimumSeverity,
-                    maximumSeverity
+                    maximumSeverity,
+                    servers
                 }));
+                return;
             } else {
                 let entryCount = 0;
                 let data: string[] = [];
@@ -93,14 +97,21 @@ export default class FrontEndcontroller extends HasApp {
                                 this.redis.smembers(setKey, (err, reply) => {
                                     if (!err) {
                                         reply.some((message) => {
-                                            if (message.includes(searchTerm)) {
-                                                let info = JSON.parse(message);
-                                                if (info.severity >= minimumSeverity && info.severity <= maximumSeverity) {
-                                                    if (entryCount >= pageStart && entryCount < pageEnd) {
-                                                        data.push(message);
+                                            if (message.indexOf(searchTerm) >= 0) {
+                                                try {
+                                                    let info: MessageInfo = JSON.parse(message);
+                                                    if (servers.length === 0 || servers.includes(info.server ?? 'UNDEFINED')) {
+                                                        if (typeof (info.severity) === 'number' &&
+                                                            info.severity >= minimumSeverity &&
+                                                            info.severity <= maximumSeverity) {
+                                                            if (entryCount >= pageStart && entryCount < pageEnd) {
+                                                                data.push(message);
+                                                            }
+                                                            entryCount++;
+                                                        }
                                                     }
-                                                    entryCount++;
                                                 }
+                                                catch { }
                                             }
                                             return entryCount >= pageEnd;
                                         });
@@ -122,4 +133,12 @@ export default class FrontEndcontroller extends HasApp {
         }
     }
 
+}
+
+class MessageInfo {
+    constructor(
+        public severity: number,
+        public server: string,
+
+    ) { }
 }

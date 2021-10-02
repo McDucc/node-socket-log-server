@@ -1,11 +1,11 @@
-import { TemplatedApp, App, SSLApp } from 'uWebSockets.js';
+import { TemplatedApp, SSLApp } from 'uWebSockets.js';
 import { env } from './env';
 
 export default class HasApp {
 
     protected app: TemplatedApp;
 
-    constructor() {
+    constructor(public port: number) {
 
         /*
         * This is not optimal obviously but allows for a direct use in production.
@@ -16,19 +16,20 @@ export default class HasApp {
             process.exit(1);
         });
 
-        this.app = App(
+        this.app = SSLApp(
             {
+                "key_file_name": "server.key",
+                "cert_file_name": "server.cert"
             });
 
     }
 
     startListening() {
-        let port = env.ssl ? env.ssl_port : env.port;
-        this.app.listen(env.host, port, (listenSocket) => {
+        this.app.listen(env.host, this.port, (listenSocket) => {
             if (listenSocket) {
-                console.log(`${this.constructor.name} is listening on ${env.host}:${port}`)
+                console.log(`${this.constructor.name} is listening on ${env.host}:${this.port}`)
             } else {
-                console.log(`${this.constructor.name} could not start listening on ${env.host}:${port}`)
+                console.log(`${this.constructor.name} could not start listening on ${env.host}:${this.port}`)
             }
         })
     }

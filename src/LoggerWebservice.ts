@@ -11,7 +11,7 @@ export default class LoggerWebservice extends HasApp {
     redis: RedisClient;
 
     constructor() {
-        super();
+        super(env.logger_port);
         this.redis = getRedisInstance();
         this.webservice();
         this.startListening();
@@ -20,42 +20,39 @@ export default class LoggerWebservice extends HasApp {
     webservice() {
         let self = this;
         let decoder = new util.TextDecoder("utf-8");
-        this.app.ws('/x', {
+        this.app.ws('/log', {
             idleTimeout: 32,
-            maxBackpressure: 4096,
+            maxBackpressure: 32 * 1024,
             maxPayloadLength: 8 * 1024,
             compression: DISABLED,
 
             open(ws) {
+                console.log(`[${new Date().toISOString()}] WebSocket opened: ${ws.getRemoteAddressAsText()}`);
             },
 
             upgrade: (res, req, context) => {
-
-                res.upgrade({ uid: req.getHeader('id') },
-                    req.getHeader('sec-websocket-key'),
-                    req.getHeader('sec-websocket-protocol'),
-                    req.getHeader('sec-websocket-extensions'),
-                    context);
+                if (req.getQuery() !== "auth=env.logger_auth") {
+                    res.writeStatus("401 Unauthorized");
+                    res.end('Unauthorized');
+                    console.log(`[${new Date().toISOString()}] Auth failed: ${res.getRemoteAddressAsText()}`);
+                }
+                else {
+                    res.upgrade({ uid: req.getHeader('id') },
+                        req.getHeader('sec-websocket-key'),
+                        req.getHeader('sec-websocket-protocol'),
+                        req.getHeader('sec-websocket-extensions'),
+                        context);
+                }
             },
 
             message(ws, message) {
-                let time = Date.now();
-                for (let a = 0; a < 300; a++) {
-                    let w = new Array(15000);
-                    for (let i = 0; i < 15000; i++) {
-                        w[i] = i * i + i;
-                    }
-                    ws.send(w.toString());
-                }
-                console.log(Date.now() - time);
+                self.log(decoder.decode(message));
             },
 
-            drain: (ws) => {
-                console.log('WebSocket backpressure: ' + ws.getBufferedAmount());
-            },
+            drain: (ws) => { },
 
             close: (ws, code, message) => {
-                console.log('WebSocket closed');
+                console.log(`[${new Date().toISOString()}] WebSocket closed: ${ws.getRemoteAddressAsText()}`);
             }
         });
     }
