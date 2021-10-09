@@ -16,5 +16,19 @@ export const env = {
     frontend_user: "user",
     frontend_password: "password",
     backend_user: "user",
-    backend_password: "password"
+    backend_password: "password",
+    server_health: {
+        servers: [],
+        keep_registered: true,
+        error_message_threshold: 5,
+        error_message_threshold_time: 5,
+        ram_usage_threshold: 0.8,
+        ram_usage_threshold_time: 10,
+        cpu_usage_total_threshold: 0.9,
+        cpu_usage_single_threshold: 0.85,
+        cpu_usage_threshold_time: 5,
+        memory_usage_threshold: 0.8,
+        memory_usage_threshold_time: 15,
+        timeout: 2500,
+    }
 }

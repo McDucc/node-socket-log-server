@@ -6,15 +6,35 @@
         integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
 </head>
 
-<body x-data="{ autoUpdate: true, timeframe_type: 0, authenticated:0 }"
+<body
+    x-data="{ autoUpdate: true, timeframe_type: 0, authenticated:0, showModal:false, username: '', password: '', server_health: false, metrics: ['ping', 'cpu', 'ram', 'disk']}"
     style="background-color: #19222b; color: #dee2e6;">
+    <div class="modal-overlay" x-show="showModal"></div>
+    <div class="modalx bd-example" x-show="showModal">
+
+        <p class="">Please enter your credentials: </p>
+
+        <p class="mt-2">Username: </p>
+        <input class="form-control" type="text" x-model="username">
+        <p class="mt-2">Password: </p>
+        <input class="form-control" type="text" x-model="password">
+        <div class="mt-4">
+            <button class="btn btn-primary" @click="showModal = false">Close</button>
+        </div>
+    </div>
     <div class="col-md-11 mt-3" style="margin: auto; "><a
             style="font-size: xx-large; font-weight: bold; color: #0d5dd6;">Socket</a><a
             style="font-size: xx-large; font-weight: bold;">Logger</a>
         <div class="bd-example row col-md-12 mt-4" style="margin: auto;">
             <div class="row mt-2">
                 <div class="col-md-12">
-                    <button class="alert btn btn-primary" style="float: left;" x-on:click="authenticate()">Authenticate
+                    <button class="alert btn btn-primary" style="float: left;"
+                        x-on:click="showModal = true;">Authenticate
+                    </button>
+
+                    <button class="alert btn btn-primary" style="float: right;"
+                        x-on:click="server_health = !server_health;">Server
+                        Health
                     </button>
                     <div class="alert alert-danger ms-4" style="float: left;" x-show="authenticated == 1">Supplied
                         credentials seem to be incorrect.
@@ -65,8 +85,8 @@
                         </select>
                     </div>
                     <div x-show="timeframe_type == 1">
-                        <input class="form-control" type="datetime-local" value="2015-01-02T11:42:13">
-                        <input class="form-control" type="datetime-local" value="2015-01-02T11:42:13">
+                        <input class="form-control mt-1" type="datetime-local" value="2015-01-02T11:42:13">
+                        <input class="form-control mt-1" type="datetime-local" value="2015-01-02T11:42:13">
                     </div>
                 </div>
                 <div class="col-md-3"
@@ -80,7 +100,45 @@
                 </div>
             </div>
         </div>
-        <div class="bd-example row col-md-12 mt-4" style="margin: auto; font-size: 15px; font-family: monospace;">
+        <div class="bd-example row col-md-12 mt-4" style="margin: auto; font-size: 15px; font-family: monospace;"
+            x-show="server_health"
+            x-data="{servers: [{name: 'server1', pings: [33,22,120,32,44,55,77,23,43,24], ping_max:120, ping_stamps:['17.09 12:00','18.09 12:00','19.09 12:00'], ram:[12,12,12,12,12,12,12,12,12,12,12,12], cpu:[12,12,12,12,12,12,12,12,12,12,12,12], disk:[12,12,12,12,12,12,12,12,12,12,12,12]}]}">
+            <template x-for="server in servers">
+                <div class="bd-example col-md-12 mt-2">
+                    <div x-text="server.name" style="text-align: center;"></div>
+                    <template x-for="metric in metrics">
+                        <div style=" float: left; padding: 5px;" class="col-md-3">
+                            <div style="background:#414549; padding: 15px; padding-top: 20px; border-radius: 5px; float: left;"
+                                class="col-md-12">
+                                <div class="row" style=" height: 215px;">
+                                    <template x-for="unit in server[(`${metric + 's'}`)]">
+                                        <div
+                                            :style="`height: ${unit/server[metric + '_max'] * 200}px; background: #07429b; width: ${100 / (server[metric + 's'].length)}%; float: left; margin: auto; margin-bottom:0; padding:0;`">
+                                            <div x-text="unit" style="color: honeydew; font-size: smaller; width: 100%; text-align: center;
+                                            margin-top: -17.5px;">
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <div class="row" style="height: 10px;">
+                                        <div class="col-md-4" x-text="`${server[metric + '_stamps'][0]}`"
+                                            style="color: honeydew; text-align: left; font-size: smaller; padding:0; margin-top: 5px;">
+                                        </div>
+                                        <div class="col-md-4" x-text="`${server[metric + '_stamps'][1]}`"
+                                            style="color: honeydew; text-align: center; font-size: smaller;  padding:0; margin-top: 5px;">
+                                        </div>
+                                        <div class="col-md-4" x-text="`${server[metric + '_stamps'][2]}`"
+                                            style="color: honeydew; text-align: right; font-size: smaller;  padding:0; margin-top: 5px;">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </template>
+        </div>
+        <div class="bd-example row col-md-12 mt-4" style="margin: auto; font-size: 15px; font-family: monospace;"
+            x-show="!server_health">
             <div class="btn btn-primary alx">
                 &lt;
             </div>
@@ -144,6 +202,7 @@
             color: #dee2e6;
             width: auto !important;
             margin-bottom: 2em !important;
+            margin-right: 0.25em !important;
         }
 
         .bd-example {
@@ -169,189 +228,32 @@
                 border-top-left-radius: .25rem;
                 border-top-right-radius: .25rem
             }
-
-            .bd-example+.bd-clipboard+.highlight {
-                border-bottom-right-radius: .25rem;
-                border-bottom-left-radius: .25rem
-            }
         }
 
         .bd-example+p {
             margin-top: 2rem
         }
 
-        .bd-example>.form-control+.form-control {
-            margin-top: .5rem
+        .modalx {
+            z-index: 100;
+            width: 360px;
+            height: 300px;
+            position: absolute;
+            left: 50%;
+            top: 200;
+            margin-left: -180px;
+            margin-top: -150px;
+            padding: 15px;
+            background-color: rgb(33, 33, 33);
         }
 
-        .bd-example>.nav+.nav,
-        .bd-example>.alert+.alert,
-        .bd-example>.navbar+.navbar,
-        .bd-example>.progress+.progress {
-            margin-top: 1rem
-        }
-
-        .bd-example>.dropdown-menu {
-            position: static;
-            display: block
-        }
-
-        .bd-example>:last-child {
-            margin-bottom: 0
-        }
-
-        .bd-example>svg+svg,
-        .bd-example>img+img {
-            margin-left: .5rem
-        }
-
-        .bd-example>.btn,
-        .bd-example>.btn-group {
-            margin: .25rem .125rem
-        }
-
-        .bd-example>.btn-toolbar+.btn-toolbar {
-            margin-top: .5rem
-        }
-
-        .bd-example>.list-group {
-            max-width: 400px
-        }
-
-        .bd-example>[class*="list-group-horizontal"] {
-            max-width: 100%
-        }
-
-        .bd-example .fixed-top,
-        .bd-example .sticky-top {
-            position: static;
-            margin: -1rem -1rem 1rem
-        }
-
-        .bd-example .fixed-bottom {
-            position: static;
-            margin: 1rem -1rem -1rem
-        }
-
-        @media (min-width: 576px) {
-
-            .bd-example .fixed-top,
-            .bd-example .sticky-top {
-                margin: -1.5rem -1.5rem 1rem
-            }
-
-            .bd-example .fixed-bottom {
-                margin: 1rem -1.5rem -1.5rem
-            }
-        }
-
-        .bd-example .pagination {
-            margin-top: .5rem;
-            margin-bottom: .5rem
-        }
-
-        .bd-example-ratios .ratio {
-            display: inline-block;
-            width: 10rem;
-            color: #6c757d;
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6
-        }
-
-        .bd-example-ratios .ratio>div {
-            display: flex;
-            align-items: center;
-            justify-content: center
-        }
-
-        .bd-example-ratios-breakpoint .ratio-4x3 {
-            width: 16rem
-        }
-
-        @media (min-width: 768px) {
-            .bd-example-ratios-breakpoint .ratio-4x3 {
-                --bs-aspect-ratio: 50%
-            }
-        }
-
-        .bd-example-modal {
-            background-color: #fafafa
-        }
-
-        .bd-example-modal .modal {
-            position: static;
-            display: block
-        }
-
-        .bd-example-offcanvas {
-            border-top-left-radius: 0;
-            border-bottom-left-radius: 0
-        }
-
-        .bd-example-offcanvas .offcanvas {
-            position: static;
-            display: block;
-            height: 200px;
-            visibility: visible;
-            transform: translate(0)
-        }
-
-        .tooltip-demo a {
-            white-space: nowrap
-        }
-
-        .scrollspy-example {
-            position: relative;
-            height: 200px;
-            margin-top: .5rem;
-            overflow: auto
-        }
-
-        .scrollspy-example-2 {
-            position: relative;
-            height: 350px;
-            overflow: auto
-        }
-
-        .bd-example-border-utils [class^="border"] {
-            display: inline-block;
-            width: 5rem;
-            height: 5rem;
-            margin: .25rem;
-            background-color: #f5f5f5
-        }
-
-        .bd-example-border-utils-0 [class^="border"] {
-            border: 1px solid #dee2e6
-        }
-
-        .bd-example-rounded-utils [class*="rounded"] {
-            margin: .25rem
-        }
-
-        .bd-example-position-utils {
-            position: relative;
-            padding: 3em
-        }
-
-        .bd-example-position-utils .position-relative {
-            height: 200px;
-            background-color: #f5f5f5
-        }
-
-        .bd-example-position-utils .position-absolute {
-            width: 2em;
-            height: 2em;
-            background-color: #212529;
-            border-radius: .25rem
-        }
-
-        .bd-example-position-examples::after {
-            content: none
-        }
-
-        .bd-example-toasts {
-            min-height: 240px
+        .modal-overlay {
+            background: #19222b;
+            opacity: 0.3;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            z-index: 99;
         }
     </style>
 </body>
