@@ -7,18 +7,23 @@ const Redis_1 = __importDefault(require("./Redis"));
 const env_1 = require("./env");
 class CleanUpService {
     constructor() {
-        setInterval(this.cleanup, 1000 * 60 * env_1.env.cleanup_interval);
+        setInterval(this.cleanup, 60000 * env_1.env.cleanup_interval);
+        this.cleanup();
     }
     cleanup() {
-        let redis = Redis_1.default();
-        redis.keys('log:*', (err, reply) => {
+        let maximumLogAgeMillis = env_1.env.maximum_log_age * 60000;
+        let deletedKeys = 0;
+        console.log(`[${new Date().toISOString()}] Running cleanup service.`);
+        CleanUpService.redis.keys('log:*', (err, reply) => {
             if (!err) {
                 reply.forEach(element => {
-                    let time = Number.parseInt(element.substring(4, 13));
-                    if (time < Date.now() - env_1.env.maximum_log_age * 60000) {
-                        redis.del(element);
+                    let time = Number.parseInt(element.substring(4));
+                    if (time < Date.now() - maximumLogAgeMillis) {
+                        CleanUpService.redis.del(element);
+                        deletedKeys++;
                     }
                 });
+                console.log(`[${new Date().toISOString()}] Deleted ${deletedKeys} out of ${reply.length} log keys.`);
             }
             else {
                 console.log('Error while cleaning up.');
@@ -28,3 +33,4 @@ class CleanUpService {
     }
 }
 exports.default = CleanUpService;
+CleanUpService.redis = (0, Redis_1.default)();

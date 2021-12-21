@@ -11,6 +11,6 @@ export default class RequestData {
 /**
  * A helper type for object literals
  */
- export interface Dictionary<T> {
+export interface Dictionary<T> {
     [Key: string]: T;
 }

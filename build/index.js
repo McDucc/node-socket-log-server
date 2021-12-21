@@ -20,7 +20,7 @@ if (!cluster_1.default.isWorker) {
     });
 }
 else {
-    if (process.env['type'] === 'ws') {
+    if (process.env.type === 'ws') {
         new LoggerWebservice_1.default();
     }
     else {

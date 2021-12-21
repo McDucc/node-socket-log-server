@@ -16,7 +16,7 @@ if (!cluster.isWorker) {
         }
     });
 } else {
-    if (process.env['type'] === 'ws') {
+    if (process.env.type === 'ws') {
         new LoggerWebservice();
     } else {
         new FrontEndcontroller();

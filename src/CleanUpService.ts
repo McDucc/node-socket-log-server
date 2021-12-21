@@ -4,21 +4,28 @@ import { env } from './env';
 
 export default class CleanUpService {
 
+    protected static redis = getRedisInstance();
+
     constructor() {
         //Clean up logs in the configured interval
-        setInterval(this.cleanup, 1000 * 60 * env.cleanup_interval);
+        setInterval(this.cleanup, 60000 * env.cleanup_interval);
+        this.cleanup();
     }
 
     cleanup() {
-        let redis = getRedisInstance();
-        redis.keys('log:*', (err, reply) => {
+        let maximumLogAgeMillis = env.maximum_log_age * 60000;
+        let deletedKeys = 0;
+        console.log(`[${new Date().toISOString()}] Running cleanup service.`);
+        CleanUpService.redis.keys('log:*', (err, reply) => {
             if (!err) {
                 reply.forEach(element => {
                     let time = Number.parseInt(element.substring(4));
-                    if (time < Date.now() - env.maximum_log_age * 60000) {
-                        redis.del(element);
+                    if (time < Date.now() - maximumLogAgeMillis) {
+                        CleanUpService.redis.del(element);
+                        deletedKeys++;
                     }
                 });
+                console.log(`[${new Date().toISOString()}] Deleted ${deletedKeys} out of ${reply.length} log keys.`);
             } else {
                 console.log('Error while cleaning up.')
                 console.log(err);

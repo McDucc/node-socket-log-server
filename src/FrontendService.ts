@@ -3,22 +3,21 @@ import { HttpResponse } from "uWebSockets.js";
 import { Dictionary } from "./RequestData";
 import HasApp from './HasApp';
 import CleanUpService from './CleanUpService';
-import { RedisClient } from 'redis';
 import getRedisInstance from './Redis';
 import * as fs from "fs";
 import { env } from './env';
 
 export default class FrontEndcontroller extends HasApp {
 
-    redis: RedisClient;
+    static redis = getRedisInstance();
 
     constructor() {
         super(env.frontend_port);
         new CleanUpService();
         this.bind('post', '/search', this.search);
         this.bind('get', '/app', this.loadApp);
+        this.bind('get', '/connections', this.loadApp);
         this.startListening();
-        this.redis = getRedisInstance();
     }
 
     bind(method: 'post' | 'get', routePattern: string, handler: (request: RequestData, response: HttpResponse) => void) {
@@ -41,17 +40,23 @@ export default class FrontEndcontroller extends HasApp {
         });
     }
 
-    async loadApp(request: RequestData, response: HttpResponse) {
-        for (let a = 0; a < 200; a++) {
-            await new Promise(resolve => setTimeout(resolve, 200));
-            console.log(a + a);
-        }
+    async loadApp(_request: RequestData, response: HttpResponse) {
         fs.readFile('./src/frontend/app.html', (err, data) => {
             if (err) {
                 response.end('Sorry, something went wrong while loading the app.');
                 console.log(err);
             } else {
                 response.end(data);
+            }
+        });
+    }
+
+    connectionCount(_request: RequestData, response: HttpResponse) {
+        FrontEndcontroller.redis.get('ws-connections', (err, reply) => {
+            if (err || reply == null) {
+                response.end("0");
+            } else {
+                response.end(reply.toString());
             }
         });
     }
@@ -88,13 +93,13 @@ export default class FrontEndcontroller extends HasApp {
                 let pageStart = page * pageSize;
                 let pageEnd = pageStart + pageSize;
 
-                this.redis.keys('log:*', (err, reply: string[]) => {
+                FrontEndcontroller.redis.keys('log:*', (err, reply: string[]) => {
                     if (!err) {
                         reply.sort().reverse();
                         reply.some((setKey) => {
                             let time = Number.parseInt(setKey.substring(4, 13));
                             if (time < Date.now() - intervalEnd * 60000 && time > Date.now() - intervalStart * 60000) {
-                                this.redis.smembers(setKey, (err, reply) => {
+                                FrontEndcontroller.redis.smembers(setKey, (err, reply) => {
                                     if (!err) {
                                         reply.some((message) => {
                                             if (message.indexOf(searchTerm) >= 0) {
@@ -139,6 +144,6 @@ class MessageInfo {
     constructor(
         public severity: number,
         public server: string,
-
+        public data: string
     ) { }
 }

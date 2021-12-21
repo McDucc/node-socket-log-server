@@ -1,23 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -26,43 +7,42 @@ const HasApp_1 = __importDefault(require("./HasApp"));
 const Redis_1 = __importDefault(require("./Redis"));
 const env_1 = require("./env");
 const uWebSockets_js_1 = require("uWebSockets.js");
-const util = __importStar(require("util"));
+const globalFunctions_1 = __importDefault(require("./globalFunctions"));
 class LoggerWebservice extends HasApp_1.default {
     constructor() {
-        super();
-        this.redis = Redis_1.default();
+        super(env_1.env.logger_port);
+        this.redis = (0, Redis_1.default)();
         this.webservice();
         this.startListening();
     }
     webservice() {
         let self = this;
-        let decoder = new util.TextDecoder("utf-8");
-        this.app.ws('/x', {
+        this.app.ws('/log', {
             idleTimeout: 32,
-            maxBackpressure: 4096,
+            maxBackpressure: 32 * 1024,
             maxPayloadLength: 8 * 1024,
             compression: uWebSockets_js_1.DISABLED,
-            open(ws) {
+            open: (ws) => {
+                this.redis.incr('ws-connections');
+                console.log(`[${new Date().toISOString()}] WebSocket opened: ${(0, globalFunctions_1.default)(ws.getRemoteAddressAsText())}`);
             },
             upgrade: (res, req, context) => {
-                res.upgrade({ uid: req.getHeader('id') }, req.getHeader('sec-websocket-key'), req.getHeader('sec-websocket-protocol'), req.getHeader('sec-websocket-extensions'), context);
-            },
-            message(ws, message) {
-                let time = Date.now();
-                for (let a = 0; a < 300; a++) {
-                    let w = new Array(15000);
-                    for (let i = 0; i < 15000; i++) {
-                        w[i] = i * i + i;
-                    }
-                    ws.send(w.toString());
+                if (req.getQuery() !== "auth=" + env_1.env.logger_password) {
+                    res.writeStatus("401 Unauthorized");
+                    res.end('Unauthorized');
+                    console.log(`[${new Date().toISOString()}] Auth failed: ${(0, globalFunctions_1.default)(res.getRemoteAddressAsText())}`);
                 }
-                console.log(Date.now() - time);
+                else {
+                    res.upgrade({ uid: req.getHeader('id') }, req.getHeader('sec-websocket-key'), req.getHeader('sec-websocket-protocol'), req.getHeader('sec-websocket-extensions'), context);
+                }
             },
-            drain: (ws) => {
-                console.log('WebSocket backpressure: ' + ws.getBufferedAmount());
+            message(_ws, message) {
+                self.log((0, globalFunctions_1.default)(message));
             },
-            close: (ws, code, message) => {
-                console.log('WebSocket closed');
+            drain: (_ws) => { },
+            close: (_ws, code, _message) => {
+                this.redis.decr('ws-connections');
+                console.log(`[${new Date().toISOString()}] WebSocket closed: ${code}`);
             }
         });
     }

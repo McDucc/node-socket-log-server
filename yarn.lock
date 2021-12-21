@@ -71,6 +71,6 @@
   "resolved" "https://registry.npmjs.org/typescript/-/typescript-4.3.5.tgz"
   "version" "4.3.5"
 
-"uWebSockets.js@uNetworking/uWebSockets.js#v19.3.0":
-  "resolved" "git+ssh://git@github.com/uNetworking/uWebSockets.js.git#7bf0faac5859fef2d113e83d22803f7833774c11"
-  "version" "19.3.0"
+"uWebSockets.js@uNetworking/uWebSockets.js#v20.6.0":
+  "resolved" "git+ssh://git@github.com/uNetworking/uWebSockets.js.git#a58e810e47a23696410f6073c8c905dc38f75da5"
+  "version" "20.6.0"

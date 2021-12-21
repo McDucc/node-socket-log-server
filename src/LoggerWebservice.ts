@@ -3,7 +3,7 @@ import { RedisClient } from 'redis';
 import getRedisInstance from './Redis';
 import { env } from './env';
 import { DISABLED } from 'uWebSockets.js';
-import * as util from 'util'
+import ArrayBufferToString from './globalFunctions';
 
 
 export default class LoggerWebservice extends HasApp {
@@ -19,22 +19,22 @@ export default class LoggerWebservice extends HasApp {
 
     webservice() {
         let self = this;
-        let decoder = new util.TextDecoder("utf-8");
         this.app.ws('/log', {
             idleTimeout: 32,
             maxBackpressure: 32 * 1024,
             maxPayloadLength: 8 * 1024,
             compression: DISABLED,
 
-            open(ws) {
-                console.log(`[${new Date().toISOString()}] WebSocket opened: ${ws.getRemoteAddressAsText()}`);
+            open: (ws) => {
+                this.redis.incr('ws-connections');
+                console.log(`[${new Date().toISOString()}] WebSocket opened: ${ArrayBufferToString(ws.getRemoteAddressAsText())}`);
             },
 
             upgrade: (res, req, context) => {
-                if (req.getQuery() !== "auth=env.logger_auth") {
+                if (req.getQuery() !== "auth=" + env.logger_password) {
                     res.writeStatus("401 Unauthorized");
                     res.end('Unauthorized');
-                    console.log(`[${new Date().toISOString()}] Auth failed: ${res.getRemoteAddressAsText()}`);
+                    console.log(`[${new Date().toISOString()}] Auth failed: ${ArrayBufferToString(res.getRemoteAddressAsText())}`);
                 }
                 else {
                     res.upgrade({ uid: req.getHeader('id') },
@@ -45,14 +45,15 @@ export default class LoggerWebservice extends HasApp {
                 }
             },
 
-            message(ws, message) {
-                self.log(decoder.decode(message));
+            message(_ws, message) {
+                self.log(ArrayBufferToString(message));
             },
 
-            drain: (ws) => { },
+            drain: (_ws) => { },
 
-            close: (ws, code, message) => {
-                console.log(`[${new Date().toISOString()}] WebSocket closed: ${ws.getRemoteAddressAsText()}`);
+            close: (_ws, code, _message) => {
+                this.redis.decr('ws-connections');
+                console.log(`[${new Date().toISOString()}] WebSocket closed: ${code}`);
             }
         });
     }

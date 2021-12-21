@@ -27,14 +27,15 @@ const HasApp_1 = __importDefault(require("./HasApp"));
 const CleanUpService_1 = __importDefault(require("./CleanUpService"));
 const Redis_1 = __importDefault(require("./Redis"));
 const fs = __importStar(require("fs"));
+const env_1 = require("./env");
 class FrontEndcontroller extends HasApp_1.default {
     constructor() {
-        super();
+        super(env_1.env.frontend_port);
         new CleanUpService_1.default();
         this.bind('post', '/search', this.search);
         this.bind('get', '/app', this.loadApp);
+        this.bind('get', '/connections', this.loadApp);
         this.startListening();
-        this.redis = Redis_1.default();
     }
     bind(method, routePattern, handler) {
         this.app[method](routePattern, (response, request) => {
@@ -52,11 +53,7 @@ class FrontEndcontroller extends HasApp_1.default {
             });
         });
     }
-    async loadApp(request, response) {
-        for (let a = 0; a < 200; a++) {
-            await new Promise(resolve => setTimeout(resolve, 200));
-            console.log(a + a);
-        }
+    async loadApp(_request, response) {
         fs.readFile('./src/frontend/app.html', (err, data) => {
             if (err) {
                 response.end('Sorry, something went wrong while loading the app.');
@@ -67,8 +64,18 @@ class FrontEndcontroller extends HasApp_1.default {
             }
         });
     }
+    connectionCount(_request, response) {
+        FrontEndcontroller.redis.get('ws-connections', (err, reply) => {
+            if (err || reply == null) {
+                response.end("0");
+            }
+            else {
+                response.end(reply.toString());
+            }
+        });
+    }
     search(request, response) {
-        var _a, _b, _c, _d, _e, _f, _g;
+        var _a, _b, _c, _d, _e, _f, _g, _h;
         try {
             let parameters = JSON.parse(request.data);
             let searchTerm = (_a = parameters.searchTerm) !== null && _a !== void 0 ? _a : '';
@@ -78,8 +85,9 @@ class FrontEndcontroller extends HasApp_1.default {
             let page = (_e = parameters.page) !== null && _e !== void 0 ? _e : 0;
             let minimumSeverity = (_f = parameters.page) !== null && _f !== void 0 ? _f : 0;
             let maximumSeverity = (_g = parameters.page) !== null && _g !== void 0 ? _g : 10;
+            let servers = (_h = parameters.servers) !== null && _h !== void 0 ? _h : [];
             if (searchTerm === '' || (intervalStart == 0 && intervalEnd == 0) || intervalStart < intervalEnd
-                || page < 0 || pageSize < 0 || pageSize > 250 || minimumSeverity > maximumSeverity) {
+                || page < 0 || pageSize < 0 || pageSize > 250 || minimumSeverity > maximumSeverity || !Array.isArray(servers)) {
                 response.writeStatus('400 Bad Request');
                 response.end('Parameters are not within acceptable ranges: ' + JSON.stringify({
                     searchTerm,
@@ -88,31 +96,41 @@ class FrontEndcontroller extends HasApp_1.default {
                     pageSize,
                     page,
                     minimumSeverity,
-                    maximumSeverity
+                    maximumSeverity,
+                    servers
                 }));
+                return;
             }
             else {
                 let entryCount = 0;
                 let data = [];
                 let pageStart = page * pageSize;
                 let pageEnd = pageStart + pageSize;
-                this.redis.keys('log:*', (err, reply) => {
+                FrontEndcontroller.redis.keys('log:*', (err, reply) => {
                     if (!err) {
                         reply.sort().reverse();
                         reply.some((setKey) => {
                             let time = Number.parseInt(setKey.substring(4, 13));
                             if (time < Date.now() - intervalEnd * 60000 && time > Date.now() - intervalStart * 60000) {
-                                this.redis.smembers(setKey, (err, reply) => {
+                                FrontEndcontroller.redis.smembers(setKey, (err, reply) => {
                                     if (!err) {
                                         reply.some((message) => {
-                                            if (message.includes(searchTerm)) {
-                                                let info = JSON.parse(message);
-                                                if (info.severity >= minimumSeverity && info.severity <= maximumSeverity) {
-                                                    if (entryCount >= pageStart && entryCount < pageEnd) {
-                                                        data.push(message);
+                                            var _a;
+                                            if (message.indexOf(searchTerm) >= 0) {
+                                                try {
+                                                    let info = JSON.parse(message);
+                                                    if (servers.length === 0 || servers.includes((_a = info.server) !== null && _a !== void 0 ? _a : 'UNDEFINED')) {
+                                                        if (typeof (info.severity) === 'number' &&
+                                                            info.severity >= minimumSeverity &&
+                                                            info.severity <= maximumSeverity) {
+                                                            if (entryCount >= pageStart && entryCount < pageEnd) {
+                                                                data.push(message);
+                                                            }
+                                                            entryCount++;
+                                                        }
                                                     }
-                                                    entryCount++;
                                                 }
+                                                catch (_b) { }
                                             }
                                             return entryCount >= pageEnd;
                                         });
@@ -137,3 +155,11 @@ class FrontEndcontroller extends HasApp_1.default {
     }
 }
 exports.default = FrontEndcontroller;
+FrontEndcontroller.redis = (0, Redis_1.default)();
+class MessageInfo {
+    constructor(severity, server, data) {
+        this.severity = severity;
+        this.server = server;
+        this.data = data;
+    }
+}
