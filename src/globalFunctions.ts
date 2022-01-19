@@ -1,3 +1,3 @@
-export default function ArrayBufferToString(arrayBuffer: ArrayBuffer) {
-    return Buffer.from(arrayBuffer).toString();
-}
+import { TextDecoder } from "util";
+
+export const ArrayBufferDecoder = new TextDecoder('utf-8')

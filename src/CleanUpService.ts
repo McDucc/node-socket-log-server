@@ -17,14 +17,17 @@ export default class CleanUpService {
         let deletedKeys = 0;
         console.log(`[${new Date().toISOString()}] Running cleanup service.`);
         CleanUpService.redis.keys('log:*', (err, reply) => {
+            let keysForDeletion: string[] = [];
             if (!err) {
                 reply.forEach(element => {
-                    let time = Number.parseInt(element.substring(4));
+                    let time = Number.parseInt(element.substring(4)) ?? 0;
                     if (time < Date.now() - maximumLogAgeMillis) {
-                        CleanUpService.redis.del(element);
+                        keysForDeletion.push(element);
                         deletedKeys++;
                     }
                 });
+                if (keysForDeletion.length > 0)
+                    CleanUpService.redis.del(keysForDeletion);
                 console.log(`[${new Date().toISOString()}] Deleted ${deletedKeys} out of ${reply.length} log keys.`);
             } else {
                 console.log('Error while cleaning up.')

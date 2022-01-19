@@ -7,7 +7,9 @@ const HasApp_1 = __importDefault(require("./HasApp"));
 const Redis_1 = __importDefault(require("./Redis"));
 const env_1 = require("./env");
 const uWebSockets_js_1 = require("uWebSockets.js");
-const globalFunctions_1 = __importDefault(require("./globalFunctions"));
+const uuid_1 = require("uuid");
+const url_1 = require("url");
+const globalFunctions_1 = require("./globalFunctions");
 class LoggerWebservice extends HasApp_1.default {
     constructor() {
         super(env_1.env.logger_port);
@@ -18,31 +20,24 @@ class LoggerWebservice extends HasApp_1.default {
     webservice() {
         let self = this;
         this.app.ws('/log', {
-            idleTimeout: 32,
-            maxBackpressure: 32 * 1024,
+            idleTimeout: 240,
+            maxBackpressure: 256 * 1024,
             maxPayloadLength: 8 * 1024,
             compression: uWebSockets_js_1.DISABLED,
             open: (ws) => {
-                this.redis.incr('ws-connections');
-                console.log(`[${new Date().toISOString()}] WebSocket opened: ${(0, globalFunctions_1.default)(ws.getRemoteAddressAsText())}`);
+                this.redis.sadd('servers', `${ws.name} (${globalFunctions_1.ArrayBufferDecoder.decode(ws.getRemoteAddressAsText())})`);
+                console.log(`[${new Date().toISOString()}] WebSocket opened: ${ws.uid}, name: ${ws.name}, address: ${globalFunctions_1.ArrayBufferDecoder.decode(ws.getRemoteAddressAsText())}`);
             },
             upgrade: (res, req, context) => {
-                if (req.getQuery() !== "auth=" + env_1.env.logger_password) {
-                    res.writeStatus("401 Unauthorized");
-                    res.end('Unauthorized');
-                    console.log(`[${new Date().toISOString()}] Auth failed: ${(0, globalFunctions_1.default)(res.getRemoteAddressAsText())}`);
-                }
-                else {
-                    res.upgrade({ uid: req.getHeader('id') }, req.getHeader('sec-websocket-key'), req.getHeader('sec-websocket-protocol'), req.getHeader('sec-websocket-extensions'), context);
-                }
+                let query = new url_1.URLSearchParams(req.getQuery());
+                res.upgrade({ uid: (0, uuid_1.v4)(), name: "sus" }, req.getHeader('sec-websocket-key'), req.getHeader('sec-websocket-protocol'), req.getHeader('sec-websocket-extensions'), context);
             },
             message(_ws, message) {
-                self.log((0, globalFunctions_1.default)(message));
+                _ws.send(Buffer.from(new Uint32Array(128)), true);
             },
             drain: (_ws) => { },
-            close: (_ws, code, _message) => {
-                this.redis.decr('ws-connections');
-                console.log(`[${new Date().toISOString()}] WebSocket closed: ${code}`);
+            close: (ws, code, _message) => {
+                console.log(`[${new Date().toISOString()}] WebSocket closed: ${ws.uid}, name: ${ws.name}, code: ${code}`);
             }
         });
     }

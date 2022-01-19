@@ -15,14 +15,18 @@ class CleanUpService {
         let deletedKeys = 0;
         console.log(`[${new Date().toISOString()}] Running cleanup service.`);
         CleanUpService.redis.keys('log:*', (err, reply) => {
+            let keysForDeletion = [];
             if (!err) {
                 reply.forEach(element => {
-                    let time = Number.parseInt(element.substring(4));
+                    var _a;
+                    let time = (_a = Number.parseInt(element.substring(4))) !== null && _a !== void 0 ? _a : 0;
                     if (time < Date.now() - maximumLogAgeMillis) {
-                        CleanUpService.redis.del(element);
+                        keysForDeletion.push(element);
                         deletedKeys++;
                     }
                 });
+                if (keysForDeletion.length > 0)
+                    CleanUpService.redis.del(keysForDeletion);
                 console.log(`[${new Date().toISOString()}] Deleted ${deletedKeys} out of ${reply.length} log keys.`);
             }
             else {

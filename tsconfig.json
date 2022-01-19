@@ -18,7 +18,7 @@
     "emitDecoratorMetadata": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    "incremental": true,
+    "incremental": false,
     "allowUnreachableCode": true,
   }
 }

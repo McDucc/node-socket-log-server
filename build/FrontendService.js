@@ -28,17 +28,32 @@ const CleanUpService_1 = __importDefault(require("./CleanUpService"));
 const Redis_1 = __importDefault(require("./Redis"));
 const fs = __importStar(require("fs"));
 const env_1 = require("./env");
+const path_1 = __importDefault(require("path"));
+const util = __importStar(require("util"));
 class FrontEndcontroller extends HasApp_1.default {
     constructor() {
         super(env_1.env.frontend_port);
+        this.redis = (0, Redis_1.default)();
+        this.searchLockLimit = 3;
+        this.searchLock = 0;
         new CleanUpService_1.default();
         this.bind('post', '/search', this.search);
-        this.bind('get', '/app', this.loadApp);
-        this.bind('get', '/connections', this.loadApp);
+        this.bind('post', '/auth', this.authTest);
+        this.bind('post', '/servers', this.getServers);
+        this.serveFile('app.html');
+        this.serveFile('favicon.ico');
+        this.serveFile('style.css');
+        this.serveFile('bootstrap.css');
+        this.serveFile('bootstrap.css.map');
+        this.serveFile('translation.js');
+        this.serveFile('alpine.js');
         this.startListening();
+        this.smemberPromise = util.promisify(this.redis.smembers);
+        this.keysPromise = util.promisify(this.redis.keys);
     }
     bind(method, routePattern, handler) {
-        this.app[method](routePattern, (response, request) => {
+        handler = handler.bind(this);
+        this.app[method](routePattern, function (response, request) {
             response.onAborted(() => { });
             let headers = {};
             request.forEach((headerKey, headerValue) => {
@@ -53,109 +68,146 @@ class FrontEndcontroller extends HasApp_1.default {
             });
         });
     }
-    async loadApp(_request, response) {
-        fs.readFile('./src/frontend/app.html', (err, data) => {
+    async serveFile(file) {
+        let filePath = path_1.default.resolve(__dirname, './frontend/' + file);
+        if (!fs.existsSync(filePath))
+            console.log(new Error(filePath + ' does not exist and can not be bound to router!'));
+        this.bind('get', '/' + file, (request, response) => {
+            fs.readFile(filePath, (err, data) => {
+                if (err)
+                    console.log(err);
+                response.end(data);
+            });
+        });
+    }
+    authTest(request, response) {
+        if (request.headers['auth-token'] != env_1.env.logger_password) {
+            response.end('Unauthenticated');
+            return;
+        }
+        response.end('Authenticated');
+        return;
+    }
+    getServers(request, response) {
+        if (request.headers['auth-token'] != env_1.env.logger_password) {
+            response.end('Unauthenticated');
+            return;
+        }
+        this.redis.smembers('servers', (err, reply) => {
             if (err) {
-                response.end('Sorry, something went wrong while loading the app.');
                 console.log(err);
             }
-            else {
-                response.end(data);
-            }
+            response.end(JSON.stringify({
+                data: reply
+            }));
         });
     }
-    connectionCount(_request, response) {
-        FrontEndcontroller.redis.get('ws-connections', (err, reply) => {
-            if (err || reply == null) {
-                response.end("0");
-            }
-            else {
-                response.end(reply.toString());
-            }
-        });
-    }
-    search(request, response) {
+    async search(request, response) {
         var _a, _b, _c, _d, _e, _f, _g, _h;
+        if (request.headers['auth-token'] != env_1.env.logger_password) {
+            response.end('Unauthenticated');
+            return;
+        }
+        if (this.searchLock >= this.searchLockLimit) {
+            response.end('Locked');
+            return;
+        }
         try {
+            this.searchLock++;
             let parameters = JSON.parse(request.data);
-            let searchTerm = (_a = parameters.searchTerm) !== null && _a !== void 0 ? _a : '';
-            let intervalStart = (_b = parameters.intervalStart) !== null && _b !== void 0 ? _b : 0;
-            let intervalEnd = (_c = parameters.intervalEnd) !== null && _c !== void 0 ? _c : 0;
-            let pageSize = (_d = parameters.pageSize) !== null && _d !== void 0 ? _d : 0;
-            let page = (_e = parameters.page) !== null && _e !== void 0 ? _e : 0;
-            let minimumSeverity = (_f = parameters.page) !== null && _f !== void 0 ? _f : 0;
-            let maximumSeverity = (_g = parameters.page) !== null && _g !== void 0 ? _g : 10;
-            let servers = (_h = parameters.servers) !== null && _h !== void 0 ? _h : [];
-            if (searchTerm === '' || (intervalStart == 0 && intervalEnd == 0) || intervalStart < intervalEnd
-                || page < 0 || pageSize < 0 || pageSize > 250 || minimumSeverity > maximumSeverity || !Array.isArray(servers)) {
+            (_a = parameters.searchTerms) !== null && _a !== void 0 ? _a : (parameters.searchTerms = []);
+            (_b = parameters.intervalStart) !== null && _b !== void 0 ? _b : (parameters.intervalStart = 0);
+            (_c = parameters.intervalEnd) !== null && _c !== void 0 ? _c : (parameters.intervalEnd = 0);
+            (_d = parameters.pageSize) !== null && _d !== void 0 ? _d : (parameters.pageSize = 0);
+            (_e = parameters.page) !== null && _e !== void 0 ? _e : (parameters.page = 0);
+            (_f = parameters.minimumSeverity) !== null && _f !== void 0 ? _f : (parameters.minimumSeverity = 0);
+            (_g = parameters.maximumSeverity) !== null && _g !== void 0 ? _g : (parameters.maximumSeverity = 10);
+            (_h = parameters.servers) !== null && _h !== void 0 ? _h : (parameters.servers = []);
+            if (!Array.isArray(parameters.searchTerms) ||
+                (parameters.intervalStart == 0 && parameters.intervalEnd == 0) ||
+                parameters.intervalStart < parameters.intervalEnd ||
+                parameters.page < 0 ||
+                parameters.pageSize < 0 ||
+                parameters.minimumSeverity > parameters.maximumSeverity ||
+                !Array.isArray(parameters.servers)) {
                 response.writeStatus('400 Bad Request');
-                response.end('Parameters are not within acceptable ranges: ' + JSON.stringify({
-                    searchTerm,
-                    intervalStart,
-                    intervalEnd,
-                    pageSize,
-                    page,
-                    minimumSeverity,
-                    maximumSeverity,
-                    servers
-                }));
+                response.end('Parameters are not within acceptable ranges');
                 return;
             }
             else {
                 let entryCount = 0;
                 let data = [];
-                let pageStart = page * pageSize;
-                let pageEnd = pageStart + pageSize;
-                FrontEndcontroller.redis.keys('log:*', (err, reply) => {
-                    if (!err) {
-                        reply.sort().reverse();
-                        reply.some((setKey) => {
-                            let time = Number.parseInt(setKey.substring(4, 13));
-                            if (time < Date.now() - intervalEnd * 60000 && time > Date.now() - intervalStart * 60000) {
-                                FrontEndcontroller.redis.smembers(setKey, (err, reply) => {
-                                    if (!err) {
-                                        reply.some((message) => {
-                                            var _a;
-                                            if (message.indexOf(searchTerm) >= 0) {
-                                                try {
-                                                    let info = JSON.parse(message);
-                                                    if (servers.length === 0 || servers.includes((_a = info.server) !== null && _a !== void 0 ? _a : 'UNDEFINED')) {
-                                                        if (typeof (info.severity) === 'number' &&
-                                                            info.severity >= minimumSeverity &&
-                                                            info.severity <= maximumSeverity) {
-                                                            if (entryCount >= pageStart && entryCount < pageEnd) {
-                                                                data.push(message);
-                                                            }
-                                                            entryCount++;
-                                                        }
-                                                    }
-                                                }
-                                                catch (_b) { }
-                                            }
-                                            return entryCount >= pageEnd;
-                                        });
-                                    }
-                                });
-                            }
-                            return entryCount >= pageEnd;
-                        });
-                    }
-                    else {
-                        console.log(err);
-                    }
-                    response.writeStatus('200 OK');
-                    response.end(JSON.stringify(data));
-                });
+                let pageStart = parameters.page * parameters.pageSize;
+                let pageEnd = (parameters.page + 1) * parameters.pageSize;
+                let now = Date.now();
+                let intervalEnd = now - parameters.intervalEnd * 60000;
+                let intervalStart = now - parameters.intervalStart * 60000;
+                let reply = await this.keysPromise('log:*');
+                reply = reply.sort().reverse();
+                if (!Array.isArray(parameters.searchTerms)) {
+                    parameters.searchTerms = [parameters.searchTerms];
+                }
+                for (let i = 0; i < parameters.searchTerms.length; i++) {
+                    if (typeof parameters.searchTerms[i] !== 'string')
+                        parameters.searchTerms[i] = JSON.stringify(parameters.searchTerms[i]);
+                }
+                for (let i = 0; i < reply.length; i++) {
+                    let setKey = reply[i];
+                    let time = Number.parseInt(setKey.substring(4, 13));
+                    if (time < intervalEnd && time > intervalStart)
+                        entryCount = await this.searchSet(setKey, parameters.searchTerms, parameters.servers, parameters.minimumSeverity, parameters.maximumSeverity, entryCount, pageStart, pageEnd, data);
+                    if (entryCount >= pageEnd)
+                        break;
+                }
+                response.writeStatus('200 OK');
+                response.end(JSON.stringify({ data }));
             }
         }
         catch (err) {
             response.writeStatus('500 Internal Server Error');
             response.end(JSON.stringify(err));
         }
+        finally {
+            this.searchLock--;
+        }
+    }
+    async searchSet(setKey, searchTerms, servers, minimumSeverity, maximumSeverity, entryCount, pageStart, pageEnd, data) {
+        try {
+            let reply = await this.smemberPromise(setKey);
+            reply.some((message) => {
+                var _a;
+                for (let i = 0; i < searchTerms.length; i++) {
+                    let searchTerm = searchTerms[i];
+                    if (searchTerm === '' || message.indexOf(searchTerm) >= 0) {
+                        try {
+                            let info = JSON.parse(message);
+                            if (servers.length === 0 ||
+                                servers.includes((_a = info.server) !== null && _a !== void 0 ? _a : 'UNDEFINED') &&
+                                    typeof (info.severity) === 'number' &&
+                                    info.severity >= minimumSeverity &&
+                                    info.severity <= maximumSeverity) {
+                                if (entryCount >= pageStart && entryCount < pageEnd) {
+                                    data.push(message);
+                                }
+                                entryCount++;
+                            }
+                        }
+                        catch (err) {
+                            console.log(err);
+                        }
+                        break;
+                    }
+                }
+                return entryCount >= pageEnd;
+            });
+        }
+        catch (err) {
+            console.log(err);
+        }
+        return entryCount;
     }
 }
 exports.default = FrontEndcontroller;
-FrontEndcontroller.redis = (0, Redis_1.default)();
 class MessageInfo {
     constructor(severity, server, data) {
         this.severity = severity;

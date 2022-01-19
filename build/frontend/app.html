@@ -30,8 +30,8 @@
                     </button>
 
                     <button class="alert btn btn-primary float-end"
-                        x-on:click="$store.controls.showServerMetrics ^= true"
-                        x-text="$store.controls.showServerMetrics ? 'Switch to messages' : 'Switch to metrics'">
+                        x-on:click="$store.controls.showServerHealth ^= true"
+                        x-text="$store.controls.showServerHealth ? 'Switch to messages' : 'Switch to metrics'">
                     </button>
                     <div class="alert alert-danger ms-4 float-start" x-show="$store.credentials.authenticated == 1">
                         Supplied
@@ -51,7 +51,7 @@
                 <div class="col-md-3">
                     <p x-text="translate('update_speed')"></p>
                     <select class="form-control mt-2">
-                        <template x-for="val in [3,5,10,15,30,60]">
+                        <template x-for="val in [2,3,5,10,15,30,60]">
                             <option x-text="val + translate('seconds')" :value="val"></option>
                         </template>
                     </select>
@@ -61,10 +61,10 @@
                 <div class="col-md-3">
                     <p>Timeframe-Type:</p>
                     <select x-model="$store.controls.timeframeType" class="form-control mt-2">
-                        <option value="since" selected>Messages since</option>
-                        <option value="timeframe">Messages within Timeframe</option>
+                        <option value="0" selected>Messages since</option>
+                        <option value="1">Messages within Timeframe</option>
                     </select>
-                    <div x-show="$store.controls.timeframeType == 'since'">
+                    <div x-show="$store.controls.timeframeType == 0">
                         <select class="form-control mt-2" x-model="$store.controls.timeSelect">
                             <template x-for="val in [5,10,15,30,60]">
                                 <option x-text="val + translate('minutes')" :value="val"></option>
@@ -75,7 +75,7 @@
                             <option x-text="translate('all_time')" value="999999"></option>
                         </select>
                     </div>
-                    <div x-show="$store.controls.timeframeType == 'timeframe'">
+                    <div x-show="$store.controls.timeframeType == 1">
                         <input class="form-control mt-1" type="datetime-local" x-model="$store.controls.datetime1">
                         <input class="form-control mt-1" type="datetime-local" x-model="$store.controls.datetime2">
                     </div>
@@ -91,7 +91,7 @@
             </div>
         </div>
         <div class="bd-example row col-md-12 mt-4" style="margin: auto; font-size: 15px; font-family: monospace;"
-            x-show="$store.controls.showServerMetrics">
+            x-show="$store.controls.showServerHealth">
             <template x-for="server in $store.log.servers">
                 <div class="bd-example col-md-12 mt-2">
                     <div x-text="server.name" style="text-align: center;"></div>
@@ -104,7 +104,7 @@
             </template>
         </div>
         <div class="bd-example row col-md-12 mt-4" style="margin: auto; font-size: 15px; font-family: monospace;"
-            x-show="!$store.controls.showServerMetrics">
+            x-show="!$store.controls.showServerHealth">
             <div class="btn btn-primary alx">
                 &lt;
             </div>
@@ -159,77 +159,25 @@
         }
 
         async function updateServerList() {
-            let response = await fetch('/servers', basicPost());
-            let json = await response.json();
-            Alpine.store('log').servers = json.data;
-        }
-
-        const millisecondToMinute = 60000.0;
-        const cpu_load = 'cpu_load';
-        const ram_used = 'ram_used';
-        const disk_read = 'disk_read_iops';
-        const disk_write = 'disk_write_iops';
-        const disk_wait = 'disk_wait_percent';
-        const disk_used = 'disk_used';
-        const traffic_in = 'traffic_in_kb';
-        const traffic_out = 'traffic_out_kb';
-
-        function getTimestamps(timestamp) {
-            if (timestamp == 0)
-                return Alpine.store('controls').timeframeType == 'since' ? Alpine.store('controls').timeSelect : (Date.now() - new Date(Alpine.store('controls').datetime1).getTime()) / millisecondToMinute;
-            else
-                return Alpine.store('controls').timeframeType == 'since' ? 0 : (Date.now() - new Date(Alpine.store('controls').datetime2).getTime()) / millisecondToMinute;
-        }
-
-        async function updateMetrics() {
-            let data = basicPost();
-            data.body = {
-                parameters: {
-                    searchTerms: ['channel: "metrics"'],
-                    intervalStart: getTimestamps(0),
-                    intervalEnd: getTimestamps(1),
-                    pageSize: 20000,
-                    page: 0,
-                    minimumSeverity: 0,
-                    maximumSeverity: 0,
-                    servers: Alpine.store('log').servers
-                }
-            };
-            let response = await fetch('/search', data);
-            let json = await response.json();
-            let resolution = 20;
-            if (Array.isArray(json.data)) {
-                metricsCompiled = {};
-                let totalCounts = {};
-                let totalValues = {};
-                json.data.forEach(element => {
-
-                });
-
-                Object.keys(counts).forEach((server, index) => {
-                    Object.keys(server).forEach((key, index) => {
-                        metricsCompiled[server][key] = totalValues[server][key] / totalCounts[server][key];
-                    });
-                });
-            }
-        }
-
-        setInterval(() => {
-            if (Alpine.store('credentials').authenticated === 2)
+            if (Alpine.store('credentials').authenticated === 2) {
                 try {
-                    await updateServerList();
-                    await updateMetrics();
+                    let response = await fetch('/servers', basicPost());
+                    let json = await response.json();
+                    Alpine.store('log').servers = json.data;
                 } catch (err) {
                     console.log(err)
                 }
-        }, 5000);
+            }
+        }
 
-        document.addEventListener('alpine:init', () => {
+        setInterval(updateServerList, 1000);
+    </script>
+    <script>document.addEventListener('alpine:init', () => {
 
             Alpine.store('log', {
                 servers: [],
                 messages: [],
-                metricsCompiled: {}
+                health: []
             })
 
             Alpine.store('controls', {
@@ -237,10 +185,10 @@
                 datetime2: new Date().toISOString().split('.')[0],
                 timeSelect: '2',
                 showModal: true,
-                showServerMetrics: false,
+                showServerHealth: false,
                 autoUpdate: false,
-                metrics: [cpu_load, ram_used, disk_read, disk_write, disk_wait, disk_used, traffic_in, traffic_out],
-                timeframeType: 'since',
+                metrics: ['errors', 'warnings', 'cpu', 'ram', 'disk_usage', 'disk_load', 'traffic'],
+                timeframeType: 1,
                 currentPage: 0,
                 searchTerm: '',
             })
@@ -253,49 +201,52 @@
             this.translate = initializeTranslation(Alpine);
         });
 
-        function search(searchTerm, minimumSeverity, maximumSeverity, page, pageSize) {
-            let data = basicPost();
+        function registerCanvas(id) {
 
-            data.body = {
-                parameters: {
-                    searchTerms: [searchTerm],
-                    intervalStart: getTimestamps(0),
-                    intervalEnd: getTimestamps(1),
-                    pageSize,
-                    page,
-                    minimumSeverity,
-                    maximumSeverity,
-                    servers: Alpine.store('log').servers
-                }
-            };
-            let response = await fetch('/search', data);
-            let json = await response.json();
-            Alpine.store('log').messages = json.data;
+        }
+
+        function search(searchTerm, minimumSeverity, maximumSeverity, page, pageSize) {
+
+        }
+
+        function updateHealth() {
+
         }
 
         var charts = {};
+        var xlabels = {};
+        var xdata = {};
 
         document.addEventListener("DOMContentLoaded", function () {
+            let elements = document.getElementsByClassName('metric-canvas');
+            Array.prototype.forEach.call(elements, (element => {
+                registerCanvas(element.id);
+            }));
+
+            for (const [name, chart] of Object.entries(charts)) {
+                xlabels[name] = Array.from({ length: 12 }, () => Math.floor(Math.random() * 100));
+                xdata[name] = Array.from({ length: 12 }, () => Math.floor(Math.random() * 100));
+
+                makeOrUpdateChart(xdata[name], name, xlabels[name]);
+            }
+
             setInterval(() => {
-                syncCharts();
-            }, 2500);
+                for (const [name, chart] of Object.entries(charts)) {
+                    xlabels[name].pop();
+                    xlabels[name].unshift(Math.floor(Math.random() * 20 + xlabels[name][0] * 0.8));
+
+                    xdata[name].pop();
+                    xdata[name].unshift(Math.floor(Math.random() * 20 + xdata[name][0] * 0.8));
+
+                    makeOrUpdateChart(xdata[name], name, xlabels[name]);
+                }
+            }, 2000);
         });
 
-        function syncCharts() {
-            try {
-                Array.prototype.forEach.call(document.getElementsByClassName('metric-canvas'), (element => {
-                    let name = element.id
-                    makeOrUpdateChart(metricsCompiled[name], name, metricsCompiledLabels[name], element);
-                }));
-            } catch (err) {
-                console.log(err);
-            }
-        }
-
-        function makeOrUpdateChart(chartData, chartName, chartLabels, element) {
+        function makeOrUpdateChart(chartData, chartName, chartLabels) {
             if (charts[chartName] == undefined) {
                 console.log('Creating chart ' + chartName);
-                let context = element.getContext('2d');
+                let context = document.getElementById(chartName).getContext('2d');
                 let myChart = new Chart(context, {
                     type: 'line',
                     data: {

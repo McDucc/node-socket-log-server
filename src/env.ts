@@ -13,10 +13,7 @@ export const env = {
     redis_tls: undefined,
     redis_db: 0,
     frontend_port: 443,
-    frontend_user: "user",
-    frontend_password: "password",
     logger_port: 8080,
-    logger_user: "user",
     logger_password: "password",
     server_health: {
         servers: [],
