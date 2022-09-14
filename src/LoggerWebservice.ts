@@ -5,59 +5,51 @@ import { env } from './env';
 import { DISABLED } from 'uWebSockets.js';
 import { v4 as uuidv4 } from 'uuid';
 import { URLSearchParams } from 'url';
-import { ArrayBufferDecoder } from './globalFunctions';
-
 
 export default class LoggerWebservice extends HasApp {
 
-    redis: RedisClient;
+    redisClients: RedisClient[] = [];
 
     constructor() {
         super(env.logger_port);
-        this.redis = getRedisInstance();
-        this.webservice();
-        this.startListening();
-    }
+        //Multiple redis clients speed up performance in most cases, especially if your redis instance has I/O threads
+        for (let i = 0; i < 10; i++) this.redisClients[i] = getRedisInstance();
 
-    webservice() {
-        let self = this;
         this.app.ws('/log', {
             idleTimeout: 240,
             maxBackpressure: 256 * 1024,
             maxPayloadLength: 8 * 1024,
             compression: DISABLED,
 
-            open: (ws) => {
-                this.redis.sadd('servers', `${ws.name} (${ArrayBufferDecoder.decode(ws.getRemoteAddressAsText())})`);
-                console.log(`[${new Date().toISOString()}] WebSocket opened: ${ws.uid}, name: ${ws.name}, address: ${ArrayBufferDecoder.decode(ws.getRemoteAddressAsText())}`);
-            },
-
             upgrade: (res, req, context) => {
-                let query = new URLSearchParams(req.getQuery());
-                if (query.get('auth') !== env.logger_password || query.get('name') === null) {
-                    res.writeStatus("401 Unauthorized");
-                    res.end('Unauthorized');
-                    console.log(`[${new Date().toISOString()}] Auth failed: ${ArrayBufferDecoder.decode(res.getRemoteAddressAsText())}`);
-                }
-                else {
-                    res.upgrade({ uid: uuidv4(), name: query.get('name') },
-                        req.getHeader('sec-websocket-key'),
-                        req.getHeader('sec-websocket-protocol'),
-                        req.getHeader('sec-websocket-extensions'),
-                        context);
-                }
+
+                let parameters = new URLSearchParams(req.getQuery());
+
+                if (!parameters.get('name') || !parameters.get('auth') || parameters.get('auth') != env.logger_password) return res.end('Unauthorized or name / auth missing.');
+
+                let uuid = uuidv4();
+                let name = parameters.get('name');
+                let address = Buffer.from(res.getProxiedRemoteAddressAsText()).toString();
+                console.log(`[${new Date().toISOString()}] Accepted connection with ${name}: ${address}`);
+                res.upgrade({ uuid, name },
+                    req.getHeader('sec-websocket-key'),
+                    req.getHeader('sec-websocket-protocol'),
+                    req.getHeader('sec-websocket-extensions'),
+                    context);
             },
 
-            message(_ws, message) {
-                self.log(ArrayBufferDecoder.decode(message));
+            message: (_ws, message) => {
+                this.log(Buffer.from(message).toString());
             },
 
             drain: (_ws) => { },
 
             close: (ws, code, _message) => {
-                console.log(`[${new Date().toISOString()}] WebSocket closed: ${ws.uid}, name: ${ws.name}, code: ${code}`);
+                console.log(`[${new Date().toISOString()}] WebSocket closed: ${ws.uuid}, name: ${ws.name}, code: ${code}`);
             }
         });
+
+        this.startListening();
     }
 
     log(data: string) {
@@ -65,6 +57,6 @@ export default class LoggerWebservice extends HasApp {
         //Rounding to the specified interval.
         //Changing the interval does not have a direct effect on user experience, this is only for storage organization
         let logKey = 'log:' + (time - (time % (env.log_interval * 60000)));
-        this.redis.sadd(logKey, data);
+        this.redisClients[time % 10].sadd(logKey, data);
     }
 }

@@ -13,8 +13,8 @@ export default class FrontEndcontroller extends HasApp {
 
     redis = getRedisInstance();
 
-    smemberPromise: (arg1: string) => Promise<string[]>;
-    keysPromise: (arg1: string) => Promise<string[]>;
+    smembers: (arg1: string) => Promise<string[]>;
+    keys: (arg1: string) => Promise<string[]>;
 
     //The search function is limited since it can be pretty intense for the server
     searchLockLimit = 3;
@@ -36,10 +36,10 @@ export default class FrontEndcontroller extends HasApp {
         this.serveFile('translation.js');
         this.serveFile('alpine.js');
 
-
         this.startListening();
-        this.smemberPromise = util.promisify(this.redis.smembers);
-        this.keysPromise = util.promisify(this.redis.keys);
+        this.smembers = util.promisify(this.redis.smembers);
+        this.keys = util.promisify(this.redis.keys);
+
     }
 
     bind(method: 'post' | 'get', routePattern: string, handler: (request: RequestData, response: HttpResponse) => void) {
@@ -75,8 +75,7 @@ export default class FrontEndcontroller extends HasApp {
 
         this.bind('get', '/' + file, (request: RequestData, response: HttpResponse) => {
             fs.readFile(filePath, (err, data) => {
-                if (err)
-                    console.log(err);
+                if (err) console.log(err);
                 response.end(data);
             });
         });
@@ -84,27 +83,20 @@ export default class FrontEndcontroller extends HasApp {
 
     authTest(request: RequestData, response: HttpResponse) {
         if (request.headers['auth-token'] != env.logger_password) {
-            response.end('Unauthenticated');
-            return;
+            return response.end('Unauthenticated');
         }
 
-        response.end('Authenticated');
-        return;
+        return response.end('Authenticated');
     }
 
     getServers(request: RequestData, response: HttpResponse) {
         if (request.headers['auth-token'] != env.logger_password) {
-            response.end('Unauthenticated');
-            return;
+            return response.end('Unauthenticated');
         }
 
-        this.redis.smembers('servers', (err: any, reply: string[]) => {
-            if (err) {
-                console.log(err);
-            }
-            response.end(JSON.stringify({
-                data: reply
-            }));
+        this.redis.smembers('servers', (err: any, data: string[]) => {
+            if (err) console.log(err);
+            response.end(JSON.stringify(data));
         });
     }
 
@@ -112,13 +104,11 @@ export default class FrontEndcontroller extends HasApp {
     async search(request: RequestData, response: HttpResponse) {
 
         if (request.headers['auth-token'] != env.logger_password) {
-            response.end('Unauthenticated');
-            return;
+            return response.end('Unauthenticated');
         }
 
         if (this.searchLock >= this.searchLockLimit) {
-            response.end('Locked');
-            return;
+            return response.end('Locked');
         }
 
         try {
@@ -154,7 +144,7 @@ export default class FrontEndcontroller extends HasApp {
                 let intervalStart = now - parameters.intervalStart * 60000;
 
                 //Logs are saved in redis keys with log:* where * equals the time
-                let reply = await this.keysPromise('log:*');
+                let reply = await this.keys('log:*');
                 reply = reply.sort().reverse();
 
                 if (!Array.isArray(parameters.searchTerms)) {
@@ -207,7 +197,7 @@ export default class FrontEndcontroller extends HasApp {
         pageEnd: number,
         data: string[]): Promise<number> {
         try {
-            let reply = await this.smemberPromise(setKey);
+            let reply = await this.smembers(setKey);
 
             reply.some((message) => {
                 for (let i = 0; i < searchTerms.length; i++) {

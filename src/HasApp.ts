@@ -16,12 +16,7 @@ export default class HasApp {
             process.exit(1);
         });
 
-        this.app = env.ssl ? SSLApp(
-            {
-                "key_file_name": env.ssl_key,
-                "cert_file_name": env.ssl_cert
-            }) : App();
-
+        this.app = App();
     }
 
     startListening() {

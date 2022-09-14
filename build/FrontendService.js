@@ -30,6 +30,8 @@ const fs = __importStar(require("fs"));
 const env_1 = require("./env");
 const path_1 = __importDefault(require("path"));
 const util = __importStar(require("util"));
+const ws_1 = __importDefault(require("ws"));
+let w;
 class FrontEndcontroller extends HasApp_1.default {
     constructor() {
         super(env_1.env.frontend_port);
@@ -47,6 +49,9 @@ class FrontEndcontroller extends HasApp_1.default {
         this.serveFile('bootstrap.css.map');
         this.serveFile('translation.js');
         this.serveFile('alpine.js');
+        w = new ws_1.default("ws://127.0.0.1:8080/log");
+        w.onmessage = (e) => { console.log((new Uint16Array(Buffer.from(e.data))).toString() + "\n"); };
+        w.onopen = (e) => { w.send('HELLO'); };
         this.startListening();
         this.smemberPromise = util.promisify(this.redis.smembers);
         this.keysPromise = util.promisify(this.redis.keys);
