@@ -20,8 +20,10 @@
             <button class="btn btn-primary" @click=" $store.controls.showModal=false; authenticate();">Close</button>
         </div>
     </div>
-    <div class="col-md-11 mt-3" style="margin: auto; "><a class="title-x" style="color: #0d5dd6;">Socket</a><a
-            class="title-x">Logger</a>
+    <div class="col-md-11 mt-3" style="margin: auto; ">
+        <a class="title-x">Node</a>
+        <a class="title-x blue-text">Socket</a>
+        <a class="title-x">Logger</a>
         <div class="bd-example row col-md-12 mt-4" style="margin: auto;">
             <div class="row mt-2">
                 <div class="col-md-12">
@@ -33,17 +35,17 @@
                         x-on:click="$store.controls.showServerMetrics ^= true"
                         x-text="$store.controls.showServerMetrics ? 'Switch to messages' : 'Switch to metrics'">
                     </button>
-                    <div class="alert alert-danger ms-4 float-start" x-show="$store.credentials.authenticated == 1">
-                        Supplied
-                        credentials seem to be incorrect.
+                    <div class="alert alert-danger ms-4 float-start"
+                    x-show="$store.credentials.authenticated == 1" x-text="translate('credentials_incorrect')">
                     </div>
-                    <div class="alert alert-dark ms-4 alm float-start" x-show="$store.credentials.authenticated == 2">
-                        Authenticated successfully.</div>
+                    <div class="alert alert-dark ms-4 alm float-start"
+                    x-show="$store.credentials.authenticated == 2" x-text="translate('auth_successful')">
+                    </div>
                 </div>
             </div>
             <div class=" row mt-2">
                 <div class="col-md-3">
-                    <p>Search Term:</p>
+                    <p x-text="translate('search_term')"></p>
                     <input class="form-control" type="text" x-model="$store.controls.searchTerm">
                     <button class="btn btn-primary form-control mt-2"
                         x-bind:disabled="!!$store.controls.autoUpdate">Search</button>
@@ -61,8 +63,8 @@
                 <div class="col-md-3">
                     <p>Timeframe-Type:</p>
                     <select x-model="$store.controls.timeframeType" class="form-control mt-2">
-                        <option value="since" selected>Messages since</option>
-                        <option value="timeframe">Messages within Timeframe</option>
+                        <option value="since" selected x-text="translate('timeframe_type_since')"></option>
+                        <option value="timeframe" x-text="translate('timeframe_type_timeframe')"></option>
                     </select>
                     <div x-show="$store.controls.timeframeType == 'since'">
                         <select class="form-control mt-2" x-model="$store.controls.timeSelect">
@@ -142,210 +144,7 @@
             </div>
         </div>
     </div>
-    <script>
-        let basicPost = () => {
-            return {
-                method: 'POST',
-                cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
-                headers: {
-                    'auth-token': Alpine.store('credentials').password
-                }
-            };
-        }
-
-        async function authenticate() {
-            let response = await fetch('/auth', basicPost());
-            Alpine.store('credentials').authenticated = await response.text() === 'Authenticated' ? 2 : 1;
-        }
-
-        async function updateServerList() {
-            let response = await fetch('/servers', basicPost());
-            let json = await response.json();
-            Alpine.store('log').servers = json.data;
-        }
-
-        const millisecondToMinute = 60000.0;
-        const cpu_load = 'cpu_load';
-        const ram_used = 'ram_used';
-        const disk_read = 'disk_read_iops';
-        const disk_write = 'disk_write_iops';
-        const disk_wait = 'disk_wait_percent';
-        const disk_used = 'disk_used';
-        const traffic_in = 'traffic_in_kb';
-        const traffic_out = 'traffic_out_kb';
-
-        function getTimestamps(timestamp) {
-            if (timestamp == 0)
-                return Alpine.store('controls').timeframeType == 'since' ? Alpine.store('controls').timeSelect : (Date.now() - new Date(Alpine.store('controls').datetime1).getTime()) / millisecondToMinute;
-            else
-                return Alpine.store('controls').timeframeType == 'since' ? 0 : (Date.now() - new Date(Alpine.store('controls').datetime2).getTime()) / millisecondToMinute;
-        }
-
-        async function updateMetrics() {
-            let data = basicPost();
-            data.body = {
-                parameters: {
-                    searchTerms: ['channel: "metrics"'],
-                    intervalStart: getTimestamps(0),
-                    intervalEnd: getTimestamps(1),
-                    pageSize: 20000,
-                    page: 0,
-                    minimumSeverity: 0,
-                    maximumSeverity: 0,
-                    servers: Alpine.store('log').servers
-                }
-            };
-            let response = await fetch('/search', data);
-            let json = await response.json();
-            let resolution = 20;
-            if (Array.isArray(json.data)) {
-                metricsCompiled = {};
-                let totalCounts = {};
-                let totalValues = {};
-                json.data.forEach(element => {
-
-                });
-
-                Object.keys(counts).forEach((server, index) => {
-                    Object.keys(server).forEach((key, index) => {
-                        metricsCompiled[server][key] = totalValues[server][key] / totalCounts[server][key];
-                    });
-                });
-            }
-        }
-
-        setInterval(() => {
-            if (Alpine.store('credentials').authenticated === 2)
-                try {
-                    await updateServerList();
-                    await updateMetrics();
-                } catch (err) {
-                    console.log(err)
-                }
-        }, 5000);
-
-        document.addEventListener('alpine:init', () => {
-
-            Alpine.store('log', {
-                servers: [],
-                messages: [],
-                metricsCompiled: {}
-            })
-
-            Alpine.store('controls', {
-                datetime1: new Date().toISOString().split('.')[0],
-                datetime2: new Date().toISOString().split('.')[0],
-                timeSelect: '2',
-                showModal: true,
-                showServerMetrics: false,
-                autoUpdate: false,
-                metrics: [cpu_load, ram_used, disk_read, disk_write, disk_wait, disk_used, traffic_in, traffic_out],
-                timeframeType: 'since',
-                currentPage: 0,
-                searchTerm: '',
-            })
-
-            Alpine.store('credentials', {
-                password: '',
-                authenticated: 0
-            })
-
-            this.translate = initializeTranslation(Alpine);
-        });
-
-        function search(searchTerm, minimumSeverity, maximumSeverity, page, pageSize) {
-            let data = basicPost();
-
-            data.body = {
-                parameters: {
-                    searchTerms: [searchTerm],
-                    intervalStart: getTimestamps(0),
-                    intervalEnd: getTimestamps(1),
-                    pageSize,
-                    page,
-                    minimumSeverity,
-                    maximumSeverity,
-                    servers: Alpine.store('log').servers
-                }
-            };
-            let response = await fetch('/search', data);
-            let json = await response.json();
-            Alpine.store('log').messages = json.data;
-        }
-
-        var charts = {};
-
-        document.addEventListener("DOMContentLoaded", function () {
-            setInterval(() => {
-                syncCharts();
-            }, 2500);
-        });
-
-        function syncCharts() {
-            try {
-                Array.prototype.forEach.call(document.getElementsByClassName('metric-canvas'), (element => {
-                    let name = element.id
-                    makeOrUpdateChart(metricsCompiled[name], name, metricsCompiledLabels[name], element);
-                }));
-            } catch (err) {
-                console.log(err);
-            }
-        }
-
-        function makeOrUpdateChart(chartData, chartName, chartLabels, element) {
-            if (charts[chartName] == undefined) {
-                console.log('Creating chart ' + chartName);
-                let context = element.getContext('2d');
-                let myChart = new Chart(context, {
-                    type: 'line',
-                    data: {
-                        labels: chartLabels,
-                        datasets: [{
-                            label: chartName,
-                            data: chartData,
-                            fill: true,
-                            backgroundColor: '#07429b',
-                            borderColor: '#002468',
-                            tension: 0.1
-                        }]
-                    },
-                    options: {
-                        plugins: {
-                            legend: {
-                                labels: {
-                                    color: "white"
-                                }
-                            }
-                        },
-                        scales: {
-                            y: {
-                                ticks: {
-                                    color: "white"
-                                },
-                                grid: {
-                                    color: '#888'
-                                }
-                            },
-                            x: {
-                                ticks: {
-                                    color: "white"
-                                },
-                                grid: {
-                                    color: '#888'
-                                }
-                            }
-                        }
-                    }
-                });
-                charts[chartName] = myChart;
-            } else {
-                console.log('Updating chart ' + chartName);
-                charts[chartName].data.datasets[0].data = chartData;
-                charts[chartName].data.labels = chartLabels;
-                charts[chartName].update();
-            }
-        }
-    </script>
 </body>
 
+<script src="/frontend.js"></script>
 </html>

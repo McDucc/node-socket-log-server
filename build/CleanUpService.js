@@ -30,8 +30,7 @@ class CleanUpService {
                 console.log(`[${new Date().toISOString()}] Deleted ${deletedKeys} out of ${reply.length} log keys.`);
             }
             else {
-                console.log('Error while cleaning up.');
-                console.log(err);
+                console.log('Error while cleaning up.', err);
             }
         });
     }

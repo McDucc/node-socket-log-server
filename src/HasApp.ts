@@ -8,7 +8,7 @@ export default class HasApp {
     constructor(public port: number) {
 
         /*
-        * This is not optimal obviously but allows for a direct use in production.
+        * This is not optimal but allows for a direct use in production.
         * Please report uncaught exceptions on github.
         */
         process.on('uncaughtException', function (err) {

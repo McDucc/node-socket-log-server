@@ -1,7 +1,11 @@
 "use strict";
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
 }) : (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     o[k2] = m[k];
@@ -29,37 +33,33 @@ const Redis_1 = __importDefault(require("./Redis"));
 const fs = __importStar(require("fs"));
 const env_1 = require("./env");
 const path_1 = __importDefault(require("path"));
-const util = __importStar(require("util"));
-const ws_1 = __importDefault(require("ws"));
-let w;
 class FrontEndcontroller extends HasApp_1.default {
     constructor() {
         super(env_1.env.frontend_port);
         this.redis = (0, Redis_1.default)();
-        this.searchLockLimit = 3;
+        this.onAbortNoAction = () => { };
+        this.searchLockLimit = env_1.env.search_limit;
         this.searchLock = 0;
         new CleanUpService_1.default();
         this.bind('post', '/search', this.search);
         this.bind('post', '/auth', this.authTest);
         this.bind('post', '/servers', this.getServers);
-        this.serveFile('app.html');
-        this.serveFile('favicon.ico');
-        this.serveFile('style.css');
-        this.serveFile('bootstrap.css');
-        this.serveFile('bootstrap.css.map');
-        this.serveFile('translation.js');
-        this.serveFile('alpine.js');
-        w = new ws_1.default("ws://127.0.0.1:8080/log");
-        w.onmessage = (e) => { console.log((new Uint16Array(Buffer.from(e.data))).toString() + "\n"); };
-        w.onopen = (e) => { w.send('HELLO'); };
+        ['app.html',
+            'favicon.ico',
+            'style.css',
+            'bootstrap.css',
+            'bootstrap.css.map',
+            'translation.js',
+            'alpine.js',
+            'frontend.js'].forEach((element) => {
+            this.serveFile(element);
+        });
         this.startListening();
-        this.smemberPromise = util.promisify(this.redis.smembers);
-        this.keysPromise = util.promisify(this.redis.keys);
     }
     bind(method, routePattern, handler) {
         handler = handler.bind(this);
-        this.app[method](routePattern, function (response, request) {
-            response.onAborted(() => { });
+        this.app[method](routePattern, (response, request) => {
+            response.onAborted(this.onAbortNoAction);
             let headers = {};
             request.forEach((headerKey, headerValue) => {
                 headers[headerKey] = headerValue;
@@ -87,54 +87,40 @@ class FrontEndcontroller extends HasApp_1.default {
     }
     authTest(request, response) {
         if (request.headers['auth-token'] != env_1.env.logger_password) {
-            response.end('Unauthenticated');
-            return;
+            return response.end('Unauthenticated');
         }
-        response.end('Authenticated');
-        return;
+        return response.end('Authenticated');
     }
     getServers(request, response) {
         if (request.headers['auth-token'] != env_1.env.logger_password) {
-            response.end('Unauthenticated');
-            return;
+            return response.end('Unauthenticated');
         }
-        this.redis.smembers('servers', (err, reply) => {
-            if (err) {
+        this.redis.smembers('servers', (err, data) => {
+            if (err)
                 console.log(err);
-            }
-            response.end(JSON.stringify({
-                data: reply
-            }));
+            response.end(JSON.stringify(data));
         });
     }
+    parametersInvalid(parameters) {
+        return !Array.isArray(parameters.searchTerms) ||
+            (parameters.intervalStart == 0 && parameters.intervalEnd == 0) ||
+            parameters.intervalStart < parameters.intervalEnd ||
+            parameters.page < 0 ||
+            parameters.pageSize < 0 ||
+            parameters.minimumLevel > parameters.maximumLevel ||
+            !Array.isArray(parameters.servers);
+    }
     async search(request, response) {
-        var _a, _b, _c, _d, _e, _f, _g, _h;
         if (request.headers['auth-token'] != env_1.env.logger_password) {
-            response.end('Unauthenticated');
-            return;
+            return response.end('Unauthenticated');
         }
         if (this.searchLock >= this.searchLockLimit) {
-            response.end('Locked');
-            return;
+            return response.end('Locked');
         }
         try {
             this.searchLock++;
             let parameters = JSON.parse(request.data);
-            (_a = parameters.searchTerms) !== null && _a !== void 0 ? _a : (parameters.searchTerms = []);
-            (_b = parameters.intervalStart) !== null && _b !== void 0 ? _b : (parameters.intervalStart = 0);
-            (_c = parameters.intervalEnd) !== null && _c !== void 0 ? _c : (parameters.intervalEnd = 0);
-            (_d = parameters.pageSize) !== null && _d !== void 0 ? _d : (parameters.pageSize = 0);
-            (_e = parameters.page) !== null && _e !== void 0 ? _e : (parameters.page = 0);
-            (_f = parameters.minimumSeverity) !== null && _f !== void 0 ? _f : (parameters.minimumSeverity = 0);
-            (_g = parameters.maximumSeverity) !== null && _g !== void 0 ? _g : (parameters.maximumSeverity = 10);
-            (_h = parameters.servers) !== null && _h !== void 0 ? _h : (parameters.servers = []);
-            if (!Array.isArray(parameters.searchTerms) ||
-                (parameters.intervalStart == 0 && parameters.intervalEnd == 0) ||
-                parameters.intervalStart < parameters.intervalEnd ||
-                parameters.page < 0 ||
-                parameters.pageSize < 0 ||
-                parameters.minimumSeverity > parameters.maximumSeverity ||
-                !Array.isArray(parameters.servers)) {
+            if (this.parametersInvalid(parameters)) {
                 response.writeStatus('400 Bad Request');
                 response.end('Parameters are not within acceptable ranges');
                 return;
@@ -147,7 +133,9 @@ class FrontEndcontroller extends HasApp_1.default {
                 let now = Date.now();
                 let intervalEnd = now - parameters.intervalEnd * 60000;
                 let intervalStart = now - parameters.intervalStart * 60000;
-                let reply = await this.keysPromise('log:*');
+                let reply = await new Promise((resolve) => {
+                    this.redis.keys('log:*', (err, data) => resolve(err ? [] : data));
+                });
                 reply = reply.sort().reverse();
                 if (!Array.isArray(parameters.searchTerms)) {
                     parameters.searchTerms = [parameters.searchTerms];
@@ -158,9 +146,9 @@ class FrontEndcontroller extends HasApp_1.default {
                 }
                 for (let i = 0; i < reply.length; i++) {
                     let setKey = reply[i];
-                    let time = Number.parseInt(setKey.substring(4, 13));
+                    let time = Number.parseInt(setKey.substring(4));
                     if (time < intervalEnd && time > intervalStart)
-                        entryCount = await this.searchSet(setKey, parameters.searchTerms, parameters.servers, parameters.minimumSeverity, parameters.maximumSeverity, entryCount, pageStart, pageEnd, data);
+                        entryCount = await this.searchSet(setKey, parameters.searchTerms, parameters.servers, parameters.minimumLevel, parameters.maximumLevel, entryCount, pageStart, pageEnd, data);
                     if (entryCount >= pageEnd)
                         break;
                 }
@@ -170,53 +158,38 @@ class FrontEndcontroller extends HasApp_1.default {
         }
         catch (err) {
             response.writeStatus('500 Internal Server Error');
-            response.end(JSON.stringify(err));
+            response.end(JSON.stringify({
+                message: err.message,
+                stack: err.stack,
+            }));
         }
         finally {
             this.searchLock--;
         }
     }
-    async searchSet(setKey, searchTerms, servers, minimumSeverity, maximumSeverity, entryCount, pageStart, pageEnd, data) {
-        try {
-            let reply = await this.smemberPromise(setKey);
-            reply.some((message) => {
-                var _a;
-                for (let i = 0; i < searchTerms.length; i++) {
-                    let searchTerm = searchTerms[i];
-                    if (searchTerm === '' || message.indexOf(searchTerm) >= 0) {
-                        try {
-                            let info = JSON.parse(message);
-                            if (servers.length === 0 ||
-                                servers.includes((_a = info.server) !== null && _a !== void 0 ? _a : 'UNDEFINED') &&
-                                    typeof (info.severity) === 'number' &&
-                                    info.severity >= minimumSeverity &&
-                                    info.severity <= maximumSeverity) {
-                                if (entryCount >= pageStart && entryCount < pageEnd) {
-                                    data.push(message);
-                                }
-                                entryCount++;
-                            }
-                        }
-                        catch (err) {
-                            console.log(err);
-                        }
-                        break;
-                    }
-                }
-                return entryCount >= pageEnd;
-            });
+    async SSCAN(key, pattern) {
+        return new Promise((resolve) => {
+            this.redis.sscan(key, '0', 'MATCH', pattern, (err, data) => resolve(err ? ['0', []] : data));
+        });
+    }
+    async searchSet(setKey, searchTerms, servers, minimumLevel, maximumLevel, entryCount, pageStart, pageEnd, data) {
+        let resultSet = {};
+        for (let server of servers) {
+            let basePattern = `server:*${server}*level: [${minimumLevel}-${maximumLevel}]*`;
+            for (let searchTerm of searchTerms) {
+                let result = await this.SSCAN(setKey, basePattern + searchTerm + '*');
+                for (let element of result[1])
+                    resultSet[element] = true;
+            }
         }
-        catch (err) {
-            console.log(err);
+        for (let message of Object.keys(resultSet)) {
+            if (entryCount >= pageStart && entryCount < pageEnd) {
+                data.push(message);
+            }
+            if (++entryCount >= pageEnd)
+                break;
         }
         return entryCount;
     }
 }
 exports.default = FrontEndcontroller;
-class MessageInfo {
-    constructor(severity, server, data) {
-        this.severity = severity;
-        this.server = server;
-        this.data = data;
-    }
-}

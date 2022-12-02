@@ -1,6 +1,6 @@
 import FrontEndcontroller from './FrontendService';
 import LoggerWebservice from './LoggerWebservice';
-import cluster from 'cluster';
+import cluster, {Worker} from 'cluster';
 
 /**
  * We use the cluster module to create one worker for the webservice and one for the frontend
@@ -9,11 +9,10 @@ import cluster from 'cluster';
  * It would be convenient to theck the type in the environment but it is sadly not available to the master
  */
 if (cluster.isPrimary) {
-    let workerWebservice: number | undefined;
-    workerWebservice = cluster.fork({ type: 'ws' }).process.pid;
+    let workerWebservice = cluster.fork({ type: 'ws' }).process.pid;
     cluster.fork({ type: 'frontend' });
 
-    cluster.on('exit', (worker: { process: { pid: number; }; }, code: number, signal: string) => {
+    cluster.on('exit', (worker: Worker, code: number, signal: string) => {
         console.log(`Worker ${worker.process.pid} died. Code: ${code}. Signal: ${signal}`);
 
         if (worker.process.pid === workerWebservice) {

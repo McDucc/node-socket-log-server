@@ -8,56 +8,42 @@ const Redis_1 = __importDefault(require("./Redis"));
 const env_1 = require("./env");
 const uWebSockets_js_1 = require("uWebSockets.js");
 const uuid_1 = require("uuid");
-let unit16s = [];
-for (let i = 0; i < 5; i++) {
-    unit16s.push(new Uint16Array(i * 32));
-}
+const url_1 = require("url");
 class LoggerWebservice extends HasApp_1.default {
     constructor() {
         super(env_1.env.logger_port);
-        this.redis = (0, Redis_1.default)();
-        this.webservice();
-        this.startListening();
-    }
-    webservice() {
-        let self = this;
+        this.redisClients = [];
+        for (let i = 0; i < 10; i++)
+            this.redisClients[i] = (0, Redis_1.default)();
         this.app.ws('/log', {
-            idleTimeout: 240,
-            maxBackpressure: 1024 * 1024,
-            maxPayloadLength: 1024 * 1024,
-            compression: uWebSockets_js_1.DISABLED,
-            open: (ws) => {
-            },
+            idleTimeout: 32,
+            maxBackpressure: 256 * 1024,
+            maxPayloadLength: 2 * 1024,
+            compression: uWebSockets_js_1.DEDICATED_COMPRESSOR_16KB,
             upgrade: (res, req, context) => {
-                console.log(`[${new Date().toISOString()}] Auth ok: `);
-                res.upgrade({ uid: (0, uuid_1.v4)(), name: "k" }, req.getHeader('sec-websocket-key'), req.getHeader('sec-websocket-protocol'), req.getHeader('sec-websocket-extensions'), context);
+                let parameters = new url_1.URLSearchParams(req.getQuery());
+                if (!parameters.get('name') || !parameters.get('auth') || parameters.get('auth') != env_1.env.logger_password)
+                    return res.end('Unauthorized or name / auth missing.');
+                let uuid = (0, uuid_1.v4)();
+                let name = parameters.get('name');
+                let address = Buffer.from(res.getProxiedRemoteAddressAsText()).toString();
+                console.log(`[${new Date().toISOString()}] Accepted connection with ${name}: ${address}`);
+                res.upgrade({ uuid, name }, req.getHeader('sec-websocket-key'), req.getHeader('sec-websocket-protocol'), req.getHeader('sec-websocket-extensions'), context);
             },
-            message(_ws, message) {
-                letsgo(_ws);
+            message: (_ws, message) => {
+                this.log(Buffer.from(message).toString());
             },
             drain: (_ws) => { },
             close: (ws, code, _message) => {
-                console.log(`[${new Date().toISOString()}] WebSocket closed: ${ws.uid}, name: ${ws.name}, code: ${code}`);
+                console.log(`[${new Date().toISOString()}] WebSocket closed: ${ws.uuid}, name: ${ws.name}, code: ${code}, message: ${Buffer.from(_message).toString()}`);
             }
         });
+        this.startListening();
     }
     log(data) {
         let time = Date.now();
         let logKey = 'log:' + (time - (time % (env_1.env.log_interval * 60000)));
-        this.redis.sadd(logKey, data);
+        this.redisClients[time % 10].sadd(logKey, data);
     }
 }
 exports.default = LoggerWebservice;
-function letsgo(ws) {
-    for (let i = 0; i < 300; i++) {
-        setTimeout(() => { name(Math.random() * 22, ws); }, 50);
-    }
-}
-function name(num, ws) {
-    let arr = unit16s[Math.floor(5 * Math.random())];
-    for (let i = 0; i < arr.length; i++) {
-        arr[i] = num;
-    }
-    ws.send(arr.buffer, true);
-    setTimeout(() => { name(Math.random() * 60000, ws); }, 0);
-}

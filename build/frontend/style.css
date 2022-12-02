@@ -3,6 +3,10 @@
     border-color: #07429b;
 }
 
+.blue-text{
+    color: #07429b;
+}
+
 .alert-danger {
     color: #dee2e6;
     background-color: #80343a;

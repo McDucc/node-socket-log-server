@@ -7,17 +7,15 @@ import getRedisInstance from './Redis';
 import * as fs from "fs";
 import { env } from './env';
 import path from 'path';
-import * as util from 'util';
 
 export default class FrontEndcontroller extends HasApp {
 
     redis = getRedisInstance();
 
-    smembers: (arg1: string) => Promise<string[]>;
-    keys: (arg1: string) => Promise<string[]>;
+    onAbortNoAction = () => { };
 
     //The search function is limited since it can be pretty intense for the server
-    searchLockLimit = 3;
+    searchLockLimit = env.search_limit;
     searchLock = 0;
 
     constructor() {
@@ -28,18 +26,18 @@ export default class FrontEndcontroller extends HasApp {
         this.bind('post', '/auth', this.authTest);
         this.bind('post', '/servers', this.getServers);
 
-        this.serveFile('app.html');
-        this.serveFile('favicon.ico');
-        this.serveFile('style.css');
-        this.serveFile('bootstrap.css');
-        this.serveFile('bootstrap.css.map');
-        this.serveFile('translation.js');
-        this.serveFile('alpine.js');
+        ['app.html',
+            'favicon.ico',
+            'style.css',
+            'bootstrap.css',
+            'bootstrap.css.map',
+            'translation.js',
+            'alpine.js',
+            'frontend.js'].forEach((element) => {
+                this.serveFile(element);
+            });
 
         this.startListening();
-        this.smembers = util.promisify(this.redis.smembers);
-        this.keys = util.promisify(this.redis.keys);
-
     }
 
     bind(method: 'post' | 'get', routePattern: string, handler: (request: RequestData, response: HttpResponse) => void) {
@@ -48,8 +46,8 @@ export default class FrontEndcontroller extends HasApp {
         //https://stackoverflow.com/questions/4011793/this-is-undefined-in-javascript-class-methods
         handler = handler.bind(this);
 
-        this.app[method](routePattern, function (response, request) {
-            response.onAborted(() => { });
+        this.app[method](routePattern, (response, request) => {
+            response.onAborted(this.onAbortNoAction);
 
             let headers: Dictionary<string> = {};
 
@@ -100,6 +98,16 @@ export default class FrontEndcontroller extends HasApp {
         });
     }
 
+    parametersInvalid(parameters: any) {
+        return !Array.isArray(parameters.searchTerms) ||
+            (parameters.intervalStart == 0 && parameters.intervalEnd == 0) ||
+            parameters.intervalStart < parameters.intervalEnd ||
+            parameters.page < 0 ||
+            parameters.pageSize < 0 ||
+            parameters.minimumLevel > parameters.maximumLevel ||
+            !Array.isArray(parameters.servers);
+    }
+
 
     async search(request: RequestData, response: HttpResponse) {
 
@@ -114,22 +122,8 @@ export default class FrontEndcontroller extends HasApp {
         try {
             this.searchLock++;
             let parameters = JSON.parse(request.data);
-            parameters.searchTerms ??= [];
-            parameters.intervalStart ??= 0;
-            parameters.intervalEnd ??= 0;
-            parameters.pageSize ??= 0;
-            parameters.page ??= 0;
-            parameters.minimumSeverity ??= 0;
-            parameters.maximumSeverity ??= 10;
-            parameters.servers ??= [];
 
-            if (!Array.isArray(parameters.searchTerms) ||
-                (parameters.intervalStart == 0 && parameters.intervalEnd == 0) ||
-                parameters.intervalStart < parameters.intervalEnd ||
-                parameters.page < 0 ||
-                parameters.pageSize < 0 ||
-                parameters.minimumSeverity > parameters.maximumSeverity ||
-                !Array.isArray(parameters.servers)) {
+            if (this.parametersInvalid(parameters)) {
                 response.writeStatus('400 Bad Request');
                 response.end('Parameters are not within acceptable ranges');
                 return;
@@ -144,7 +138,9 @@ export default class FrontEndcontroller extends HasApp {
                 let intervalStart = now - parameters.intervalStart * 60000;
 
                 //Logs are saved in redis keys with log:* where * equals the time
-                let reply = await this.keys('log:*');
+                let reply: string[] = await new Promise((resolve) => {
+                    this.redis.keys('log:*', (err, data) => resolve(err ? [] : data));
+                });
                 reply = reply.sort().reverse();
 
                 if (!Array.isArray(parameters.searchTerms)) {
@@ -158,14 +154,14 @@ export default class FrontEndcontroller extends HasApp {
 
                 for (let i = 0; i < reply.length; i++) {
                     let setKey = reply[i];
-                    let time = Number.parseInt(setKey.substring(4, 13));
+                    let time = Number.parseInt(setKey.substring(4));
 
                     if (time < intervalEnd && time > intervalStart)
                         entryCount = await this.searchSet(setKey,
                             parameters.searchTerms,
                             parameters.servers,
-                            parameters.minimumSeverity,
-                            parameters.maximumSeverity,
+                            parameters.minimumLevel,
+                            parameters.maximumLevel,
                             entryCount,
                             pageStart,
                             pageEnd,
@@ -178,64 +174,52 @@ export default class FrontEndcontroller extends HasApp {
                 response.writeStatus('200 OK');
                 response.end(JSON.stringify({ data }));
             }
-        } catch (err) {
+        } catch (err: any) {
             response.writeStatus('500 Internal Server Error');
-            response.end(JSON.stringify(err));
+            response.end(JSON.stringify({
+                message: err.message,
+                stack: err.stack,
+            }));
         } finally {
             this.searchLock--;
         }
+    }
+
+    async SSCAN(key: string, pattern: string): Promise<[string, string[]]> {
+        return new Promise((resolve) => {
+            this.redis.sscan(key, '0', 'MATCH', pattern, (err, data) => resolve(err ? ['0', []] : data));
+        });
     }
 
     async searchSet(
         setKey: string,
         searchTerms: string[],
         servers: string[],
-        minimumSeverity: number,
-        maximumSeverity: number,
+        minimumLevel: number,
+        maximumLevel: number,
         entryCount: number,
         pageStart: number,
         pageEnd: number,
         data: string[]): Promise<number> {
-        try {
-            let reply = await this.smembers(setKey);
 
-            reply.some((message) => {
-                for (let i = 0; i < searchTerms.length; i++) {
-                    let searchTerm = searchTerms[i];
-                    if (searchTerm === '' || message.indexOf(searchTerm) >= 0) {
-                        try {
-                            let info: MessageInfo = JSON.parse(message);
-                            if (servers.length === 0 ||
-                                servers.includes(info.server ?? 'UNDEFINED') &&
-                                typeof (info.severity) === 'number' &&
-                                info.severity >= minimumSeverity &&
-                                info.severity <= maximumSeverity) {
-                                if (entryCount >= pageStart && entryCount < pageEnd) {
-                                    data.push(message);
-                                }
-                                entryCount++;
-                            }
-                        }
-                        catch (err: any) {
-                            console.log(err);
-                        }
-                        break;
-                    }
-                }
-                return entryCount >= pageEnd;
-            });
-        } catch (err: any) {
-            console.log(err);
+        let resultSet: Dictionary<boolean> = {};
+
+        for (let server of servers) {
+            let basePattern = `server:*${server}*level: [${minimumLevel}-${maximumLevel}]*`;
+
+            for (let searchTerm of searchTerms) {
+                let result = await this.SSCAN(setKey, basePattern + searchTerm + '*');
+                for (let element of result[1]) resultSet[element] = true;
+            }
+        }
+
+        for (let message of Object.keys(resultSet)) {
+            if (entryCount >= pageStart && entryCount < pageEnd) {
+                data.push(message);
+            }
+            if (++entryCount >= pageEnd) break;
         }
 
         return entryCount;
     }
-}
-
-class MessageInfo {
-    constructor(
-        public severity: number,
-        public server: string,
-        public data: string
-    ) { }
 }

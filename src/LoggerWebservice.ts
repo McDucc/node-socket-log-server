@@ -2,7 +2,7 @@ import HasApp from './HasApp';
 import { RedisClient } from 'redis';
 import getRedisInstance from './Redis';
 import { env } from './env';
-import { DISABLED } from 'uWebSockets.js';
+import { DEDICATED_COMPRESSOR_16KB } from 'uWebSockets.js';
 import { v4 as uuidv4 } from 'uuid';
 import { URLSearchParams } from 'url';
 
@@ -16,16 +16,17 @@ export default class LoggerWebservice extends HasApp {
         for (let i = 0; i < 10; i++) this.redisClients[i] = getRedisInstance();
 
         this.app.ws('/log', {
-            idleTimeout: 240,
+            idleTimeout: 32,
             maxBackpressure: 256 * 1024,
-            maxPayloadLength: 8 * 1024,
-            compression: DISABLED,
+            maxPayloadLength: 2 * 1024,
+            compression: DEDICATED_COMPRESSOR_16KB,
 
             upgrade: (res, req, context) => {
 
                 let parameters = new URLSearchParams(req.getQuery());
 
-                if (!parameters.get('name') || !parameters.get('auth') || parameters.get('auth') != env.logger_password) return res.end('Unauthorized or name / auth missing.');
+                if (!parameters.get('name') || !parameters.get('auth') || parameters.get('auth') != env.logger_password)
+                return res.end('Unauthorized or name / auth missing.');
 
                 let uuid = uuidv4();
                 let name = parameters.get('name');
@@ -45,7 +46,7 @@ export default class LoggerWebservice extends HasApp {
             drain: (_ws) => { },
 
             close: (ws, code, _message) => {
-                console.log(`[${new Date().toISOString()}] WebSocket closed: ${ws.uuid}, name: ${ws.name}, code: ${code}`);
+                console.log(`[${new Date().toISOString()}] WebSocket closed: ${ws.uuid}, name: ${ws.name}, code: ${code}, message: ${Buffer.from(_message).toString()}`);
             }
         });
 

@@ -8,11 +8,16 @@ function initializeTranslation(Alpine: any) {
             hours: ' hours',
             all_time: 'All time',
             auto_update_active: 'Auto Update active',
-            auto_update_deactivated: 'Auto Update deactivated'
+            auto_update_deactivated: 'Auto Update deactivated',
+            auth_credentials_incorrect: 'Supplied credentials seem to be incorrect',
+            auth_successful: 'Authenticated successfully.',
+            timeframe_type_timeframe: 'Messages within timeframe',
+            timeframe_type_since: 'Messages since',
+            search_term: 'Search Term:'
         },
     });
 
-    return function (index: string) {
-        return Alpine.store('lang')[Alpine.store('lang').current][index] ?? 'T-ERR: ' + index;
+    return (index: string) => {
+        return Alpine.store('lang')[Alpine.store('lang').current][index] ?? 'Translation missing: ' + index;
     }
 }

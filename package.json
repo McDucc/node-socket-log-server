@@ -10,7 +10,7 @@
     "@types/redis": "^2.8.31",
     "redis": "^3.1.2",
     "uuid": "^8.3.2",
-    "uWebSockets.js": "uNetworking/uWebSockets.js#v20.6.0"
+    "uWebSockets.js": "uNetworking/uWebSockets.js#v20.15.0"
   },
   "devDependencies": {
     "@types/uuid": "^8.3.3",

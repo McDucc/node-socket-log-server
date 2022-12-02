@@ -1,35 +1,28 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.env = void 0;
-exports.env = {
-    host: "0.0.0.0",
-    ssl: false,
-    ssl_cert: "server.crt",
-    ssl_key: "server.key",
-    log_interval: 3,
-    maximum_log_age: 14400,
-    cleanup_interval: 45,
-    redis_path: undefined,
-    redis_host: "127.0.0.1",
-    redis_port: 6379,
-    redis_auth: undefined,
-    redis_tls: undefined,
-    redis_db: 0,
-    frontend_port: 443,
-    logger_port: 8080,
-    logger_password: "password",
-    server_health: {
-        servers: [],
-        keep_registered: true,
-        error_message_threshold: 5,
-        error_message_threshold_time: 5,
-        ram_usage_threshold: 0.8,
-        ram_usage_threshold_time: 10,
-        cpu_usage_total_threshold: 0.9,
-        cpu_usage_single_threshold: 0.85,
-        cpu_usage_threshold_time: 5,
-        memory_usage_threshold: 0.8,
-        memory_usage_threshold_time: 15,
-        timeout: 2500,
-    }
-};
+const fs = __importStar(require("fs"));
+exports.env = JSON.parse(fs.readFileSync('env.json').toString());

@@ -6,9 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const FrontendService_1 = __importDefault(require("./FrontendService"));
 const LoggerWebservice_1 = __importDefault(require("./LoggerWebservice"));
 const cluster_1 = __importDefault(require("cluster"));
-if (!cluster_1.default.isWorker) {
-    let workerWebservice;
-    workerWebservice = cluster_1.default.fork({ type: 'ws' }).process.pid;
+if (cluster_1.default.isPrimary) {
+    let workerWebservice = cluster_1.default.fork({ type: 'ws' }).process.pid;
     cluster_1.default.fork({ type: 'frontend' });
     cluster_1.default.on('exit', (worker, code, signal) => {
         console.log(`Worker ${worker.process.pid} died. Code: ${code}. Signal: ${signal}`);
