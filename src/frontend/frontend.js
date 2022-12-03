@@ -31,10 +31,18 @@ const traffic_out = 'tout';
 const metrics = [cpu_load, ram_used, disk_read, disk_write, disk_used, traffic_in, traffic_out];
 
 function getTimestamps(timestamp) {
-    if (timestamp == 0)
-        return Alpine.store('controls').timeframeType == 'since' ? Alpine.store('controls').timeSelect : (Date.now() - new Date(Alpine.store('controls').datetime1).getTime()) / millisecondToMinute;
-    else
-        return Alpine.store('controls').timeframeType == 'since' ? 0 : (Date.now() - new Date(Alpine.store('controls').datetime2).getTime()) / millisecondToMinute;
+    if (timestamp == 0) {
+        timestamp = Alpine.store('controls').timeSelect;
+        timefield = Alpine.store('controls').datetime1;
+    } else {
+        timefield = Alpine.store('controls').datetime2;
+    }
+
+    if (Alpine.store('controls').timeframeType == 'since') {
+        return timestamp;
+    } else {
+        (Date.now() - new Date(timefield).getTime()) / millisecondToMinute;
+    }
 }
 
 async function updateMetrics() {
