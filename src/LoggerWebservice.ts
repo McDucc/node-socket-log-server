@@ -3,7 +3,6 @@ import { RedisClient } from 'redis';
 import getRedisInstance from './Redis';
 import { env } from './env';
 import { DEDICATED_COMPRESSOR_16KB } from 'uWebSockets.js';
-import { v4 as uuidv4 } from 'uuid';
 import { URLSearchParams } from 'url';
 
 export default class LoggerWebservice extends HasApp {
@@ -26,13 +25,12 @@ export default class LoggerWebservice extends HasApp {
                 let parameters = new URLSearchParams(req.getQuery());
 
                 if (!parameters.get('name') || !parameters.get('auth') || parameters.get('auth') != env.logger_password)
-                return res.end('Unauthorized or name / auth missing.');
+                    return res.end('Unauthorized or name / auth missing.');
 
-                let uuid = uuidv4();
                 let name = parameters.get('name');
                 let address = Buffer.from(res.getProxiedRemoteAddressAsText()).toString();
                 console.log(`[${new Date().toISOString()}] Accepted connection with ${name}: ${address}`);
-                res.upgrade({ uuid, name },
+                res.upgrade({ name },
                     req.getHeader('sec-websocket-key'),
                     req.getHeader('sec-websocket-protocol'),
                     req.getHeader('sec-websocket-extensions'),

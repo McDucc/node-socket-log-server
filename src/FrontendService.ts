@@ -2,7 +2,7 @@ import RequestData from './RequestData';
 import { HttpResponse } from "uWebSockets.js";
 import { Dictionary } from "./RequestData";
 import HasApp from './HasApp';
-import CleanUpService from './CleanUpService';
+import PersistenceService from './PersistenceService';
 import getRedisInstance from './Redis';
 import * as fs from "fs";
 import { env } from './env';
@@ -20,7 +20,7 @@ export default class FrontEndcontroller extends HasApp {
 
     constructor() {
         super(env.frontend_port);
-        new CleanUpService();
+        new PersistenceService();
 
         this.bind('post', '/search', this.search);
         this.bind('post', '/auth', this.authTest);
@@ -55,11 +55,11 @@ export default class FrontEndcontroller extends HasApp {
                 headers[headerKey] = headerValue;
             });
 
-            let body = '';
+            let body = Buffer.from('');
             response.onData(async (data: ArrayBuffer, isLast: boolean) => {
-                body += data;
+                body = Buffer.concat([body, Buffer.from(data)]);
                 if (isLast) {
-                    handler(new RequestData(headers, body), response);
+                    handler(new RequestData(headers, body.toString()), response);
                 }
             });
         });
@@ -121,13 +121,14 @@ export default class FrontEndcontroller extends HasApp {
 
         try {
             this.searchLock++;
-            let parameters = JSON.parse(request.data);
+            let parametersRaw = JSON.parse(request.data);
 
-            if (this.parametersInvalid(parameters)) {
+            if (this.parametersInvalid(parametersRaw)) {
                 response.writeStatus('400 Bad Request');
                 response.end('Parameters are not within acceptable ranges');
                 return;
             } else {
+                let parameters: SearchParameters = parametersRaw;
                 let entryCount = 0;
                 let data: string[] = [];
                 let pageStart = parameters.page * parameters.pageSize;
@@ -166,28 +167,26 @@ export default class FrontEndcontroller extends HasApp {
                             pageStart,
                             pageEnd,
                             data);
-
-                    if (entryCount >= pageEnd)
-                        break;
-
                 }
                 response.writeStatus('200 OK');
-                response.end(JSON.stringify({ data }));
+                response.end(JSON.stringify({ data, entryCount, page: parameters.page, pageSize: parameters.pageSize }));
             }
         } catch (err: any) {
-            response.writeStatus('500 Internal Server Error');
-            response.end(JSON.stringify({
+            let res = JSON.stringify({
                 message: err.message,
                 stack: err.stack,
-            }));
+            });
+            response.writeStatus('500 Internal Server Error');
+            response.end(res);
+            console.log(res);
         } finally {
             this.searchLock--;
         }
     }
 
-    async SSCAN(key: string, pattern: string): Promise<[string, string[]]> {
+    async SSCAN(key: string, cursor: string, pattern: string): Promise<[string, string[]]> {
         return new Promise((resolve) => {
-            this.redis.sscan(key, '0', 'MATCH', pattern, (err, data) => resolve(err ? ['0', []] : data));
+            this.redis.sscan(key, 'MATCH', pattern, (err, data) => resolve(err ? ['0', []] : data));
         });
     }
 
@@ -202,24 +201,43 @@ export default class FrontEndcontroller extends HasApp {
         pageEnd: number,
         data: string[]): Promise<number> {
 
-        let resultSet: Dictionary<boolean> = {};
-
         for (let server of servers) {
             let basePattern = `server:*${server}*level: [${minimumLevel}-${maximumLevel}]*`;
 
+            //SSCAN can return the same values multiple times to we filter them using an object literal
+            let termChecker: Dictionary<boolean> = {};
+
             for (let searchTerm of searchTerms) {
-                let result = await this.SSCAN(setKey, basePattern + searchTerm + '*');
-                for (let element of result[1]) resultSet[element] = true;
+                let result: [string, string[]];
+                let cursor = '0';
+                do {
+                    result = await this.SSCAN(setKey, cursor, basePattern + searchTerm + '*');
+                    for (let element of result[1]) {
+
+                        if (entryCount >= pageStart && entryCount < pageEnd && termChecker[element] === undefined) {
+                            termChecker[element] = true;
+                            data.push(element);
+                        }
+
+                        if (termChecker[element] === undefined || termChecker[element]) {
+                            termChecker[element] = false;
+                            entryCount++;
+                        }
+                    }
+                } while (result[0] !== '0')
             }
         }
-
-        for (let message of Object.keys(resultSet)) {
-            if (entryCount >= pageStart && entryCount < pageEnd) {
-                data.push(message);
-            }
-            if (++entryCount >= pageEnd) break;
-        }
-
         return entryCount;
     }
+}
+
+class SearchParameters {
+    searchTerms: string[] = [];
+    intervalStart: number = 0;
+    intervalEnd: number = 0;
+    page: number = 0;
+    pageSize: number = 0;
+    minimumLevel: number = 0;
+    maximumLevel: number = 0;
+    servers: string[] = [];
 }

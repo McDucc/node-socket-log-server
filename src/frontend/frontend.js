@@ -45,38 +45,44 @@ function getTimestamps(timestamp) {
     }
 }
 
+let updatingMetrics = false;
 async function updateMetrics() {
-    let data = basicPost();
-    data.body = JSON.stringify({
-        parameters: {
-            searchTerms: ['channel: "metrics"'],
-            intervalStart: getTimestamps(0),
-            intervalEnd: getTimestamps(1),
-            pageSize: 20000,
-            page: 0,
-            minimumLevel: 0,
-            maximumLevel: 0,
-            servers: Alpine.store('log').servers
-        }
-    });
-    let response = await (await fetch('/search', data)).json();
-    let resolution = 20;
-    if (Array.isArray(response.data)) {
-        metricsCompiled = {};
-        let index = 0;
-        response.data.forEach(metricEntry => {
-            let realIndex = Math.floor(index / resolution);
-            if (metricsCompiled[metricEntry.server] == undefined) metricsCompiled[metricEntry.server] = {};
-            for (let metricKey of Object.keys(metricEntry.data)) {
-                if (metricsCompiled[metricEntry.server][metricKey] == undefined) {
-                    metricsCompiled[metricEntry.server][metricKey] = [];
-                    for (let i = 0; i < resolution; i++)  metricsCompiled[metricEntry.server][metricKey][i] = 0;
-                }
-                metricsCompiled[metricEntry.server][metricKey][realIndex] += metricEntry.data[metricKey] / resolution;
+    if (updatingMetrics) return;
+    updatingMetrics = true;
+    try {
+        let data = basicPost();
+        data.body = JSON.stringify({
+            parameters: {
+                searchTerms: ['*'],
+                intervalStart: getTimestamps(0),
+                intervalEnd: getTimestamps(1),
+                pageSize: 2000,
+                page: 0,
+                minimumLevel: 0,
+                maximumLevel: 0,
+                servers: Alpine.store('log').servers
             }
-            index++;
         });
-    }
+        let response = await (await fetch('/search', data)).json();
+        let resolution = 20;
+        if (Array.isArray(response.data)) {
+            metricsCompiled = {};
+            let index = 0;
+            response.data.forEach(metricEntry => {
+                let realIndex = Math.floor(index / resolution);
+                if (metricsCompiled[metricEntry.server] == undefined) metricsCompiled[metricEntry.server] = {};
+                for (let metricKey of Object.keys(metricEntry.data)) {
+                    if (metricsCompiled[metricEntry.server][metricKey] == undefined) {
+                        metricsCompiled[metricEntry.server][metricKey] = [];
+                        for (let i = 0; i < resolution; i++)  metricsCompiled[metricEntry.server][metricKey][i] = 0;
+                    }
+                    metricsCompiled[metricEntry.server][metricKey][realIndex] += metricEntry.data[metricKey] / resolution;
+                }
+                index++;
+            });
+        }
+    } catch { }
+    updatingMetrics = false;
 }
 
 setInterval(async () => {
@@ -84,10 +90,19 @@ setInterval(async () => {
         try {
             await updateServerList();
             await updateMetrics();
+            await syncCharts();
         } catch (err) {
             console.log(err)
         }
 }, 5000);
+
+setInterval(async () => {
+    let nowInSeconds = Math.floor(Date.now() / 1000);
+
+    if (Alpine.store('controls').autoUpdate && nowInSeconds % Alpine.store('controls').autoUpdateSpeed === 0) {
+        search(Alpine.store('controls').searchTerm, 0, 10, Alpine.store('controls').page, 50);
+    }
+})
 
 document.addEventListener('alpine:init', () => {
 
@@ -104,9 +119,14 @@ document.addEventListener('alpine:init', () => {
         showModal: true,
         showServerMetrics: false,
         autoUpdate: false,
+        autoUpdateSpeed: 3,
         metrics,
         timeframeType: 'since',
-        currentPage: 0,
+        page: 0,
+        pageSize: 50,
+        lastPage: 0,
+        minimumLevel: 1,
+        maximumLevel: 10,
         searchTerm: '',
     })
 
@@ -115,43 +135,51 @@ document.addEventListener('alpine:init', () => {
         authenticated: 0
     })
 
+    //it is used in the app view
     this.translate = initializeTranslation(Alpine);
 });
 
+let searchActive = false;
 async function search(searchTerm, minimumLevel, maximumLevel, page, pageSize) {
-    let data = basicPost();
+    if (searchActive) return;
 
-    data.body = JSON.stringify({
-        parameters: {
-            searchTerms: [searchTerm],
-            intervalStart: getTimestamps(0),
-            intervalEnd: getTimestamps(1),
-            pageSize,
-            page,
-            minimumLevel,
-            maximumLevel,
-            servers: Alpine.store('log').servers
-        }
-    });
-    let response = await fetch('/search', data);
-    let json = await response.json();
-    Alpine.store('log').messages = json.data;
+    try {
+        searchActive = true;
+        let data = basicPost();
+
+        data.body = JSON.stringify({
+            parameters: {
+                searchTerms: [searchTerm],
+                intervalStart: getTimestamps(0),
+                intervalEnd: getTimestamps(1),
+                pageSize,
+                page,
+                minimumLevel,
+                maximumLevel,
+                servers: Alpine.store('log').servers
+            }
+        });
+        let response = await fetch('/search', data);
+        let json = await response.json();
+        Alpine.store('log').messages = json.data;
+        Alpine.store('controls').page = json.page;
+        Alpine.store('controls').pageSize = json.pageSize;
+        Alpine.store('controls').lastPage = Math.ceil(json.entryCount / json.pageSize);
+    } catch (err) {
+        console.log(err);
+    }
+    searchActive = false;
 }
 
 var charts = {};
-
-document.addEventListener("DOMContentLoaded", function () {
-    setInterval(() => {
-        syncCharts();
-    }, 2500);
-});
-
-function syncCharts() {
+async function syncCharts() {
     try {
-        Array.prototype.forEach.call(document.getElementsByClassName('metric-canvas'), (element => {
-            let chartName = element.id
+        let charts = document.getElementsByClassName('metric-canvas');
+        for (let element of charts) {
+            let chartName = element.id;
             makeOrUpdateChart(metricsCompiled[chartName], chartName, metricsCompiledLabels[chartName], element);
-        }));
+            await new Promise(resolve => setTimeout(resolve, 5));
+        };
     } catch (err) {
         console.log(err);
     }

@@ -1,11 +1,7 @@
 "use strict";
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
 }) : (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     o[k2] = m[k];
@@ -28,7 +24,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const RequestData_1 = __importDefault(require("./RequestData"));
 const HasApp_1 = __importDefault(require("./HasApp"));
-const CleanUpService_1 = __importDefault(require("./CleanUpService"));
+const PersistenceService_1 = __importDefault(require("./PersistenceService"));
 const Redis_1 = __importDefault(require("./Redis"));
 const fs = __importStar(require("fs"));
 const env_1 = require("./env");
@@ -40,7 +36,7 @@ class FrontEndcontroller extends HasApp_1.default {
         this.onAbortNoAction = () => { };
         this.searchLockLimit = env_1.env.search_limit;
         this.searchLock = 0;
-        new CleanUpService_1.default();
+        new PersistenceService_1.default();
         this.bind('post', '/search', this.search);
         this.bind('post', '/auth', this.authTest);
         this.bind('post', '/servers', this.getServers);
@@ -64,11 +60,11 @@ class FrontEndcontroller extends HasApp_1.default {
             request.forEach((headerKey, headerValue) => {
                 headers[headerKey] = headerValue;
             });
-            let body = '';
+            let body = Buffer.from('');
             response.onData(async (data, isLast) => {
-                body += data;
+                body = Buffer.concat([body, Buffer.from(data)]);
                 if (isLast) {
-                    handler(new RequestData_1.default(headers, body), response);
+                    handler(new RequestData_1.default(headers, body.toString()), response);
                 }
             });
         });
@@ -119,13 +115,14 @@ class FrontEndcontroller extends HasApp_1.default {
         }
         try {
             this.searchLock++;
-            let parameters = JSON.parse(request.data);
-            if (this.parametersInvalid(parameters)) {
+            let parametersRaw = JSON.parse(request.data);
+            if (this.parametersInvalid(parametersRaw)) {
                 response.writeStatus('400 Bad Request');
                 response.end('Parameters are not within acceptable ranges');
                 return;
             }
             else {
+                let parameters = parametersRaw;
                 let entryCount = 0;
                 let data = [];
                 let pageStart = parameters.page * parameters.pageSize;
@@ -149,47 +146,64 @@ class FrontEndcontroller extends HasApp_1.default {
                     let time = Number.parseInt(setKey.substring(4));
                     if (time < intervalEnd && time > intervalStart)
                         entryCount = await this.searchSet(setKey, parameters.searchTerms, parameters.servers, parameters.minimumLevel, parameters.maximumLevel, entryCount, pageStart, pageEnd, data);
-                    if (entryCount >= pageEnd)
-                        break;
                 }
                 response.writeStatus('200 OK');
-                response.end(JSON.stringify({ data }));
+                response.end(JSON.stringify({ data, entryCount, page: parameters.page, pageSize: parameters.pageSize }));
             }
         }
         catch (err) {
-            response.writeStatus('500 Internal Server Error');
-            response.end(JSON.stringify({
+            let res = JSON.stringify({
                 message: err.message,
                 stack: err.stack,
-            }));
+            });
+            response.writeStatus('500 Internal Server Error');
+            response.end(res);
+            console.log(res);
         }
         finally {
             this.searchLock--;
         }
     }
-    async SSCAN(key, pattern) {
+    async SSCAN(key, cursor, pattern) {
         return new Promise((resolve) => {
-            this.redis.sscan(key, '0', 'MATCH', pattern, (err, data) => resolve(err ? ['0', []] : data));
+            this.redis.sscan(key, 'MATCH', pattern, (err, data) => resolve(err ? ['0', []] : data));
         });
     }
     async searchSet(setKey, searchTerms, servers, minimumLevel, maximumLevel, entryCount, pageStart, pageEnd, data) {
-        let resultSet = {};
         for (let server of servers) {
             let basePattern = `server:*${server}*level: [${minimumLevel}-${maximumLevel}]*`;
+            let termChecker = {};
             for (let searchTerm of searchTerms) {
-                let result = await this.SSCAN(setKey, basePattern + searchTerm + '*');
-                for (let element of result[1])
-                    resultSet[element] = true;
+                let result;
+                let cursor = '0';
+                do {
+                    result = await this.SSCAN(setKey, cursor, basePattern + searchTerm + '*');
+                    for (let element of result[1]) {
+                        if (entryCount >= pageStart && entryCount < pageEnd && termChecker[element] === undefined) {
+                            termChecker[element] = true;
+                            data.push(element);
+                        }
+                        if (termChecker[element] === undefined || termChecker[element]) {
+                            termChecker[element] = false;
+                            entryCount++;
+                        }
+                    }
+                } while (result[0] !== '0');
             }
-        }
-        for (let message of Object.keys(resultSet)) {
-            if (entryCount >= pageStart && entryCount < pageEnd) {
-                data.push(message);
-            }
-            if (++entryCount >= pageEnd)
-                break;
         }
         return entryCount;
     }
 }
 exports.default = FrontEndcontroller;
+class SearchParameters {
+    constructor() {
+        this.searchTerms = [];
+        this.intervalStart = 0;
+        this.intervalEnd = 0;
+        this.page = 0;
+        this.pageSize = 0;
+        this.minimumLevel = 0;
+        this.maximumLevel = 0;
+        this.servers = [];
+    }
+}

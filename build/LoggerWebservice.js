@@ -7,7 +7,6 @@ const HasApp_1 = __importDefault(require("./HasApp"));
 const Redis_1 = __importDefault(require("./Redis"));
 const env_1 = require("./env");
 const uWebSockets_js_1 = require("uWebSockets.js");
-const uuid_1 = require("uuid");
 const url_1 = require("url");
 class LoggerWebservice extends HasApp_1.default {
     constructor() {
@@ -24,11 +23,10 @@ class LoggerWebservice extends HasApp_1.default {
                 let parameters = new url_1.URLSearchParams(req.getQuery());
                 if (!parameters.get('name') || !parameters.get('auth') || parameters.get('auth') != env_1.env.logger_password)
                     return res.end('Unauthorized or name / auth missing.');
-                let uuid = (0, uuid_1.v4)();
                 let name = parameters.get('name');
                 let address = Buffer.from(res.getProxiedRemoteAddressAsText()).toString();
                 console.log(`[${new Date().toISOString()}] Accepted connection with ${name}: ${address}`);
-                res.upgrade({ uuid, name }, req.getHeader('sec-websocket-key'), req.getHeader('sec-websocket-protocol'), req.getHeader('sec-websocket-extensions'), context);
+                res.upgrade({ name }, req.getHeader('sec-websocket-key'), req.getHeader('sec-websocket-protocol'), req.getHeader('sec-websocket-extensions'), context);
             },
             message: (_ws, message) => {
                 this.log(Buffer.from(message).toString());
