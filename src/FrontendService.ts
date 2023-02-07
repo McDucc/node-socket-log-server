@@ -111,7 +111,6 @@ export default class FrontEndcontroller extends HasApp {
 
 
     async search(request: RequestData, response: HttpResponse) {
-
         if (request.headers['auth-token'] != env.logger_password) {
             return response.end('Unauthenticated');
         }
@@ -124,40 +123,13 @@ export default class FrontEndcontroller extends HasApp {
             this.searchLock++;
             let parametersRaw = JSON.parse(request.data);
 
-            if (this.parametersInvalid(parametersRaw)) {
-                response.writeStatus('400 Bad Request');
-                response.end('Parameters are not within acceptable ranges');
-                return;
+            if ((request.headers['mode'] ?? 'search') === 'metrics') {
+
             } else {
-                let parameters: SearchParameters = parametersRaw;
-                let offset = parameters.page * parameters.pageSize;
-                let limit = parameters.pageSize;
-                let now = Date.now();
-                //Translate minutes to milliseconds and set the intervals relative to the current time
-                let intervalEnd = now - parameters.intervalEnd * 60000;
-                let intervalStart = now - parameters.intervalStart * 60000;
-
-                if (typeof parameters.searchTerm !== 'string') {
-                    parameters.searchTerm = JSON.stringify(parameters.searchTerm);
-                }
-
-                let data = await this.searchDatabase(
-                    parameters.searchTerm,
-                    parameters.servers,
-                    parameters.channel,
-                    parameters.minimumLevel,
-                    parameters.maximumLevel,
-                    intervalEnd,
-                    intervalStart,
-                    offset,
-                    limit);
-
-                data.pageSize = parameters.pageSize;
-                data.page = parameters.page;
-
-                response.writeStatus('200 OK');
-                response.end(JSON.stringify(data));
+                await this.databaseSearch(parametersRaw, response);
             }
+
+            await this.databaseSearch(parametersRaw, response);
         } catch (err: any) {
             let res = JSON.stringify({
                 message: err.message,
@@ -169,6 +141,58 @@ export default class FrontEndcontroller extends HasApp {
         } finally {
             this.searchLock--;
         }
+    }
+
+    async databaseSearch(parametersRaw: any, response: HttpResponse) {
+        if (this.parametersInvalid(parametersRaw)) {
+            response.writeStatus('400 Bad Request');
+            response.end('Parameters are not within acceptable ranges');
+            return;
+        } else {
+            let parameters: SearchParameters = parametersRaw;
+            let offset = parameters.page * parameters.pageSize;
+            let limit = parameters.pageSize;
+            let now = Date.now();
+            //Translate minutes to milliseconds and set the intervals relative to the current time
+            let intervalEnd = now - parameters.intervalEnd * 60000;
+            let intervalStart = now - parameters.intervalStart * 60000;
+
+            if (typeof parameters.searchTerm !== 'string') {
+                parameters.searchTerm = JSON.stringify(parameters.searchTerm);
+            }
+
+            let data = await this.databaseLookup(
+                parameters.searchTerm,
+                parameters.servers,
+                parameters.channel,
+                parameters.minimumLevel,
+                parameters.maximumLevel,
+                intervalEnd,
+                intervalStart,
+                offset,
+                limit);
+
+            data.pageSize = parameters.pageSize;
+            data.page = parameters.page;
+
+            response.writeStatus('200 OK');
+            response.end(JSON.stringify(data));
+        }
+    }
+
+    async metricsSearch(parametersRaw: any, response: HttpResponse) {
+        let parameters: MetricsParameters = parametersRaw;
+        let now = Date.now();
+        //Translate minutes to milliseconds and set the intervals relative to the current time
+        let intervalEnd = now - parameters.intervalEnd * 60000;
+        let intervalStart = now - parameters.intervalStart * 60000;
+
+        let data = await this.metricsLookup(
+            intervalEnd,
+            intervalStart);
+
+        response.writeStatus('200 OK');
+        response.end(JSON.stringify(data));
     }
 
     searchQuery1Name = 'search-query-1';
@@ -203,8 +227,28 @@ export default class FrontEndcontroller extends HasApp {
     AND level BETWEEN $3 AND $4
     AND time BETWEEN $5 AND $6`;
 
+    metricsQueryName = 'search-query-2-count';
+    metricsQuery = `SELECT level,server,time,data FROM ${env.postgres_table} WHERE 
+    AND channel = metrics
+    AND level = 0
+    AND time BETWEEN $1 AND $2`;
 
-    async searchDatabase(
+    async metricsLookup(
+        minimumTime: number,
+        maximumTime: number): Promise<SearchResult> {
+
+        let data = await this.postgresPool.query(this.metricsQueryName, this.metricsQuery, [minimumTime, maximumTime]);
+
+        return {
+            data,
+            entryCount: 0,
+            page: 0,
+            pageSize: 0
+        }
+    }
+
+
+    async databaseLookup(
         searchTerm: string,
         servers: string[] | undefined,
         channel: string | undefined,
@@ -252,6 +296,11 @@ class SearchParameters {
     searchTerm: string = '';
     servers: string[] = [];
     channel: string | undefined;
+}
+
+class MetricsParameters {
+    intervalStart: number = 0;
+    intervalEnd: number = 0;
 }
 
 class SearchResult {
