@@ -24,19 +24,45 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const RequestData_1 = __importDefault(require("./RequestData"));
 const HasApp_1 = __importDefault(require("./HasApp"));
-const PersistenceService_1 = __importDefault(require("./PersistenceService"));
-const Redis_1 = __importDefault(require("./Redis"));
 const fs = __importStar(require("fs"));
 const env_1 = require("./env");
 const path_1 = __importDefault(require("path"));
+const PostgresSetup_1 = __importDefault(require("./PostgresSetup"));
 class FrontEndcontroller extends HasApp_1.default {
     constructor() {
         super(env_1.env.frontend_port);
-        this.redis = (0, Redis_1.default)();
         this.onAbortNoAction = () => { };
         this.searchLockLimit = env_1.env.search_limit;
         this.searchLock = 0;
-        new PersistenceService_1.default();
+        this.searchQuery1Name = 'search-query-1';
+        this.searchQuery1 = `SELECT channel,level,server,time,message,data FROM ${env_1.env.postgres_table} WHERE 
+    search @@ plainto_tsquery($1)
+    AND channel = $2
+    AND level BETWEEN $3 AND $4
+    AND server IN ($5)
+    AND time BETWEEN $6 AND $7
+    OFFSET $8 LIMIT $9`;
+        this.searchQuery2Name = 'search-query-2';
+        this.searchQuery2 = `SELECT channel,level,server,time,message,data FROM ${env_1.env.postgres_table} WHERE 
+    search @@ plainto_tsquery($1)
+    AND channel = $2
+    AND level BETWEEN $3 AND $4
+    AND time BETWEEN $5 AND $6
+    OFFSET $7 LIMIT $8`;
+        this.searchQuery1CountName = 'search-query-1-count';
+        this.searchQuery1Count = `SELECT COUNT(*) as count FROM ${env_1.env.postgres_table} WHERE 
+    search @@ plainto_tsquery($1)
+    AND channel = $2
+    AND level BETWEEN $3 AND $4
+    AND server IN ($5)
+    AND time BETWEEN $6 AND $7`;
+        this.searchQuery2CountName = 'search-query-2-count';
+        this.searchQuery2Count = `SELECT COUNT(*) as count FROM ${env_1.env.postgres_table} WHERE 
+    search @@ plainto_tsquery($1)
+    AND channel = $2
+    AND level BETWEEN $3 AND $4
+    AND time BETWEEN $5 AND $6`;
+        this.postgresPool = (0, PostgresSetup_1.default)();
         this.bind('post', '/search', this.search);
         this.bind('post', '/auth', this.authTest);
         this.bind('post', '/servers', this.getServers);
@@ -87,19 +113,18 @@ class FrontEndcontroller extends HasApp_1.default {
         }
         return response.end('Authenticated');
     }
-    getServers(request, response) {
+    async getServers(request, response) {
         if (request.headers['auth-token'] != env_1.env.logger_password) {
             return response.end('Unauthenticated');
         }
-        this.redis.smembers('servers', (err, data) => {
-            if (err)
-                console.log(err);
-            response.end(JSON.stringify(data));
+        let query = await this.postgresPool.query("get-servers", "SELECT DISTINCT server from logs", []);
+        let data = query.map(entry => {
+            return entry.server;
         });
+        response.end(JSON.stringify(data));
     }
     parametersInvalid(parameters) {
-        return !Array.isArray(parameters.searchTerms) ||
-            (parameters.intervalStart == 0 && parameters.intervalEnd == 0) ||
+        return parameters.intervalStart == 0 && parameters.intervalEnd == 0 ||
             parameters.intervalStart < parameters.intervalEnd ||
             parameters.page < 0 ||
             parameters.pageSize < 0 ||
@@ -123,32 +148,19 @@ class FrontEndcontroller extends HasApp_1.default {
             }
             else {
                 let parameters = parametersRaw;
-                let entryCount = 0;
-                let data = [];
-                let pageStart = parameters.page * parameters.pageSize;
-                let pageEnd = (parameters.page + 1) * parameters.pageSize;
+                let offset = parameters.page * parameters.pageSize;
+                let limit = parameters.pageSize;
                 let now = Date.now();
                 let intervalEnd = now - parameters.intervalEnd * 60000;
                 let intervalStart = now - parameters.intervalStart * 60000;
-                let reply = await new Promise((resolve) => {
-                    this.redis.keys('log:*', (err, data) => resolve(err ? [] : data));
-                });
-                reply = reply.sort().reverse();
-                if (!Array.isArray(parameters.searchTerms)) {
-                    parameters.searchTerms = [parameters.searchTerms];
+                if (typeof parameters.searchTerm !== 'string') {
+                    parameters.searchTerm = JSON.stringify(parameters.searchTerm);
                 }
-                for (let i = 0; i < parameters.searchTerms.length; i++) {
-                    if (typeof parameters.searchTerms[i] !== 'string')
-                        parameters.searchTerms[i] = JSON.stringify(parameters.searchTerms[i]);
-                }
-                for (let i = 0; i < reply.length; i++) {
-                    let setKey = reply[i];
-                    let time = Number.parseInt(setKey.substring(4));
-                    if (time < intervalEnd && time > intervalStart)
-                        entryCount = await this.searchSet(setKey, parameters.searchTerms, parameters.servers, parameters.minimumLevel, parameters.maximumLevel, entryCount, pageStart, pageEnd, data);
-                }
+                let data = await this.searchDatabase(parameters.searchTerm, parameters.servers, parameters.channel, parameters.minimumLevel, parameters.maximumLevel, intervalEnd, intervalStart, offset, limit);
+                data.pageSize = parameters.pageSize;
+                data.page = parameters.page;
                 response.writeStatus('200 OK');
-                response.end(JSON.stringify({ data, entryCount, page: parameters.page, pageSize: parameters.pageSize }));
+                response.end(JSON.stringify(data));
             }
         }
         catch (err) {
@@ -164,46 +176,47 @@ class FrontEndcontroller extends HasApp_1.default {
             this.searchLock--;
         }
     }
-    async SSCAN(key, cursor, pattern) {
-        return new Promise((resolve) => {
-            this.redis.sscan(key, 'MATCH', pattern, (err, data) => resolve(err ? ['0', []] : data));
-        });
-    }
-    async searchSet(setKey, searchTerms, servers, minimumLevel, maximumLevel, entryCount, pageStart, pageEnd, data) {
-        for (let server of servers) {
-            let basePattern = `server:*${server}*level: [${minimumLevel}-${maximumLevel}]*`;
-            let termChecker = {};
-            for (let searchTerm of searchTerms) {
-                let result;
-                let cursor = '0';
-                do {
-                    result = await this.SSCAN(setKey, cursor, basePattern + searchTerm + '*');
-                    for (let element of result[1]) {
-                        if (entryCount >= pageStart && entryCount < pageEnd && termChecker[element] === undefined) {
-                            termChecker[element] = true;
-                            data.push(element);
-                        }
-                        if (termChecker[element] === undefined || termChecker[element]) {
-                            termChecker[element] = false;
-                            entryCount++;
-                        }
-                    }
-                } while (result[0] !== '0');
-            }
+    async searchDatabase(searchTerm, servers, channel, minimumLevel, maximumLevel, minimumTime, maximumTime, offset, pageSize) {
+        let data;
+        let entryCount;
+        if (servers === undefined) {
+            let parameters1 = [searchTerm, channel, minimumLevel, maximumLevel, minimumTime, maximumTime, offset, pageSize];
+            data = await this.postgresPool.query(this.searchQuery2Name, this.searchQuery2, parameters1);
+            let parameters2 = [searchTerm, channel, minimumLevel, maximumLevel, minimumTime, maximumTime];
+            entryCount = (await this.postgresPool.query(this.searchQuery2CountName, this.searchQuery2Count, parameters2))[0].count;
         }
-        return entryCount;
+        else {
+            let parameters1 = [searchTerm, channel, minimumLevel, maximumLevel, servers, minimumTime, maximumTime, offset, pageSize];
+            data = await this.postgresPool.query(this.searchQuery1Name, this.searchQuery1, parameters1);
+            let parameters2 = [searchTerm, channel, minimumLevel, maximumLevel, servers, minimumTime, maximumTime];
+            entryCount = (await this.postgresPool.query(this.searchQuery1CountName, this.searchQuery1Count, parameters2))[0].count;
+        }
+        return {
+            entryCount,
+            data,
+            pageSize: 0,
+            page: 0
+        };
     }
 }
 exports.default = FrontEndcontroller;
 class SearchParameters {
     constructor() {
-        this.searchTerms = [];
+        this.minimumLevel = 0;
+        this.maximumLevel = 0;
         this.intervalStart = 0;
         this.intervalEnd = 0;
         this.page = 0;
         this.pageSize = 0;
-        this.minimumLevel = 0;
-        this.maximumLevel = 0;
+        this.searchTerm = '';
         this.servers = [];
+    }
+}
+class SearchResult {
+    constructor() {
+        this.entryCount = 0;
+        this.data = [];
+        this.pageSize = 0;
+        this.page = 0;
     }
 }

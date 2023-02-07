@@ -35,11 +35,11 @@
                         x-on:click="$store.controls.showServerMetrics ^= true"
                         x-text="$store.controls.showServerMetrics ? 'Switch to messages' : 'Switch to metrics'">
                     </button>
-                    <div class="alert alert-danger ms-4 float-start"
-                    x-show="$store.credentials.authenticated == 1" x-text="translate('credentials_incorrect')">
+                    <div class="alert alert-danger ms-4 float-start" x-show="$store.credentials.authenticated == 1"
+                        x-text="translate('credentials_incorrect')">
                     </div>
-                    <div class="alert alert-dark ms-4 alm float-start"
-                    x-show="$store.credentials.authenticated == 2" x-text="translate('auth_successful')">
+                    <div class="alert alert-dark ms-4 alm float-start" x-show="$store.credentials.authenticated == 2"
+                        x-text="translate('auth_successful')">
                     </div>
                 </div>
             </div>
@@ -52,7 +52,7 @@
                 </div>
                 <div class="col-md-3">
                     <p x-text="translate('update_speed')"></p>
-                    <select class="form-control mt-2">
+                    <select class="form-control mt-2" x-model="$store.controls.autoUpdateSpeed">
                         <template x-for="val in [3,5,10,15,30,60]">
                             <option x-text="val + translate('seconds')" :value="val"></option>
                         </template>
@@ -147,4 +147,5 @@
 </body>
 
 <script src="/frontend.js"></script>
+
 </html>

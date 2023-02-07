@@ -1,4 +1,4 @@
-import { TemplatedApp, SSLApp, App } from 'uWebSockets.js';
+import { TemplatedApp, SSLApp } from 'uWebSockets.js';
 import { env } from './env';
 
 export default class HasApp {
@@ -16,7 +16,10 @@ export default class HasApp {
             process.exit(1);
         });
 
-        this.app = App();
+        this.app = SSLApp({
+            cert_file_name: env.ssl_cert,
+            key_file_name: env.ssl_key
+        });
     }
 
     startListening() {

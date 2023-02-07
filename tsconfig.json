@@ -3,7 +3,7 @@
     "target": "es2017",
     "module": "commonjs",
     "lib": [
-      "es6"
+      "ES2016"
     ],
     "moduleResolution": "node",
     "allowJs": true,
@@ -18,7 +18,7 @@
     "emitDecoratorMetadata": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    "incremental": false,
+    "incremental": true,
     "allowUnreachableCode": true,
   }
 }

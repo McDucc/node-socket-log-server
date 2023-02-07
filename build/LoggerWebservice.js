@@ -4,44 +4,64 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const HasApp_1 = __importDefault(require("./HasApp"));
-const Redis_1 = __importDefault(require("./Redis"));
 const env_1 = require("./env");
 const uWebSockets_js_1 = require("uWebSockets.js");
 const url_1 = require("url");
+const PostgresSetup_1 = __importDefault(require("./PostgresSetup"));
+const TablesSetup_1 = __importDefault(require("./TablesSetup"));
 class LoggerWebservice extends HasApp_1.default {
     constructor() {
         super(env_1.env.logger_port);
-        this.redisClients = [];
-        for (let i = 0; i < 10; i++)
-            this.redisClients[i] = (0, Redis_1.default)();
+        this.writeQueryName = 'write-log';
+        this.writeQueryText = 'INSERT INTO logs (level,time,channel,message,server,data) VALUES ($1,$2,$3,$4,$5,$6)';
+        this.postgresPool = (0, PostgresSetup_1.default)();
+        (0, TablesSetup_1.default)(this.postgresPool);
         this.app.ws('/log', {
             idleTimeout: 32,
-            maxBackpressure: 256 * 1024,
-            maxPayloadLength: 2 * 1024,
+            maxBackpressure: 2 * 1024,
+            maxPayloadLength: 4 * 1024,
             compression: uWebSockets_js_1.DEDICATED_COMPRESSOR_16KB,
             upgrade: (res, req, context) => {
                 let parameters = new url_1.URLSearchParams(req.getQuery());
+                console.log(parameters);
                 if (!parameters.get('name') || !parameters.get('auth') || parameters.get('auth') != env_1.env.logger_password)
                     return res.end('Unauthorized or name / auth missing.');
                 let name = parameters.get('name');
                 let address = Buffer.from(res.getProxiedRemoteAddressAsText()).toString();
                 console.log(`[${new Date().toISOString()}] Accepted connection with ${name}: ${address}`);
-                res.upgrade({ name }, req.getHeader('sec-websocket-key'), req.getHeader('sec-websocket-protocol'), req.getHeader('sec-websocket-extensions'), context);
+                res.upgrade({ name, address }, req.getHeader('sec-websocket-key'), req.getHeader('sec-websocket-protocol'), req.getHeader('sec-websocket-extensions'), context);
             },
-            message: (_ws, message) => {
-                this.log(Buffer.from(message).toString());
+            message: (ws, message) => {
+                try {
+                    this.log(JSON.parse(Buffer.from(message).toString()), ws.name);
+                }
+                catch (_a) { }
             },
             drain: (_ws) => { },
             close: (ws, code, _message) => {
-                console.log(`[${new Date().toISOString()}] WebSocket closed: ${ws.uuid}, name: ${ws.name}, code: ${code}, message: ${Buffer.from(_message).toString()}`);
+                console.log(`[${new Date().toISOString()}] WebSocket closed: ${ws.address}, name: ${ws.name}, code: ${code}, message: ${Buffer.from(_message).toString()}`);
             }
         });
         this.startListening();
     }
-    log(data) {
-        let time = Date.now();
-        let logKey = 'log:' + (time - (time % (env_1.env.log_interval * 60000)));
-        this.redisClients[time % 10].sadd(logKey, data);
+    log(message, server) {
+        if (message.level === undefined && message.channel === undefined && message.message === undefined) {
+            this.databaseWrite(0, 'metrics', '', server, message.data);
+        }
+        else {
+            this.databaseWrite(message.level, message.channel, message.message, server, message.data);
+        }
+    }
+    databaseWrite(level, channel, message, server, data) {
+        this.postgresPool.query(this.writeQueryName, this.writeQueryText, [level, Date.now(), channel, message, server, data]);
     }
 }
 exports.default = LoggerWebservice;
+class IncomingData {
+    constructor() {
+        this.level = 0;
+        this.channel = '';
+        this.message = '';
+        this.data = '';
+    }
+}

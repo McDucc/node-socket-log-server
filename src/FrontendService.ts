@@ -2,15 +2,15 @@ import RequestData from './RequestData';
 import { HttpResponse } from "uWebSockets.js";
 import { Dictionary } from "./RequestData";
 import HasApp from './HasApp';
-import PersistenceService from './PersistenceService';
-import getRedisInstance from './Redis';
 import * as fs from "fs";
 import { env } from './env';
 import path from 'path';
+import Postgres from 'postgres';
+import SetupPostgresPool from './PostgresSetup';
 
 export default class FrontEndcontroller extends HasApp {
 
-    redis = getRedisInstance();
+    postgresPool: Postgres;
 
     onAbortNoAction = () => { };
 
@@ -20,7 +20,7 @@ export default class FrontEndcontroller extends HasApp {
 
     constructor() {
         super(env.frontend_port);
-        new PersistenceService();
+        this.postgresPool = SetupPostgresPool();
 
         this.bind('post', '/search', this.search);
         this.bind('post', '/auth', this.authTest);
@@ -87,20 +87,21 @@ export default class FrontEndcontroller extends HasApp {
         return response.end('Authenticated');
     }
 
-    getServers(request: RequestData, response: HttpResponse) {
+    async getServers(request: RequestData, response: HttpResponse) {
         if (request.headers['auth-token'] != env.logger_password) {
             return response.end('Unauthenticated');
         }
 
-        this.redis.smembers('servers', (err: any, data: string[]) => {
-            if (err) console.log(err);
-            response.end(JSON.stringify(data));
+        let query = await this.postgresPool.query("get-servers", "SELECT DISTINCT server from logs", []);
+        let data = query.map(entry => {
+            return entry.server;
         });
+
+        response.end(JSON.stringify(data));
     }
 
     parametersInvalid(parameters: any) {
-        return !Array.isArray(parameters.searchTerms) ||
-            (parameters.intervalStart == 0 && parameters.intervalEnd == 0) ||
+        return parameters.intervalStart == 0 && parameters.intervalEnd == 0 ||
             parameters.intervalStart < parameters.intervalEnd ||
             parameters.page < 0 ||
             parameters.pageSize < 0 ||
@@ -129,47 +130,33 @@ export default class FrontEndcontroller extends HasApp {
                 return;
             } else {
                 let parameters: SearchParameters = parametersRaw;
-                let entryCount = 0;
-                let data: string[] = [];
-                let pageStart = parameters.page * parameters.pageSize;
-                let pageEnd = (parameters.page + 1) * parameters.pageSize;
+                let offset = parameters.page * parameters.pageSize;
+                let limit = parameters.pageSize;
                 let now = Date.now();
                 //Translate minutes to milliseconds and set the intervals relative to the current time
                 let intervalEnd = now - parameters.intervalEnd * 60000;
                 let intervalStart = now - parameters.intervalStart * 60000;
 
-                //Logs are saved in redis keys with log:* where * equals the time
-                let reply: string[] = await new Promise((resolve) => {
-                    this.redis.keys('log:*', (err, data) => resolve(err ? [] : data));
-                });
-                reply = reply.sort().reverse();
-
-                if (!Array.isArray(parameters.searchTerms)) {
-                    parameters.searchTerms = [parameters.searchTerms];
+                if (typeof parameters.searchTerm !== 'string') {
+                    parameters.searchTerm = JSON.stringify(parameters.searchTerm);
                 }
 
-                for (let i = 0; i < parameters.searchTerms.length; i++) {
-                    if (typeof parameters.searchTerms[i] !== 'string')
-                        parameters.searchTerms[i] = JSON.stringify(parameters.searchTerms[i]);
-                }
+                let data = await this.searchDatabase(
+                    parameters.searchTerm,
+                    parameters.servers,
+                    parameters.channel,
+                    parameters.minimumLevel,
+                    parameters.maximumLevel,
+                    intervalEnd,
+                    intervalStart,
+                    offset,
+                    limit);
 
-                for (let i = 0; i < reply.length; i++) {
-                    let setKey = reply[i];
-                    let time = Number.parseInt(setKey.substring(4));
+                data.pageSize = parameters.pageSize;
+                data.page = parameters.page;
 
-                    if (time < intervalEnd && time > intervalStart)
-                        entryCount = await this.searchSet(setKey,
-                            parameters.searchTerms,
-                            parameters.servers,
-                            parameters.minimumLevel,
-                            parameters.maximumLevel,
-                            entryCount,
-                            pageStart,
-                            pageEnd,
-                            data);
-                }
                 response.writeStatus('200 OK');
-                response.end(JSON.stringify({ data, entryCount, page: parameters.page, pageSize: parameters.pageSize }));
+                response.end(JSON.stringify(data));
             }
         } catch (err: any) {
             let res = JSON.stringify({
@@ -184,60 +171,92 @@ export default class FrontEndcontroller extends HasApp {
         }
     }
 
-    async SSCAN(key: string, cursor: string, pattern: string): Promise<[string, string[]]> {
-        return new Promise((resolve) => {
-            this.redis.sscan(key, 'MATCH', pattern, (err, data) => resolve(err ? ['0', []] : data));
-        });
-    }
+    searchQuery1Name = 'search-query-1';
+    searchQuery1 = `SELECT channel,level,server,time,message,data FROM ${env.postgres_table} WHERE 
+    search @@ plainto_tsquery($1)
+    AND channel = $2
+    AND level BETWEEN $3 AND $4
+    AND server IN ($5)
+    AND time BETWEEN $6 AND $7
+    OFFSET $8 LIMIT $9`;
 
-    async searchSet(
-        setKey: string,
-        searchTerms: string[],
-        servers: string[],
+    searchQuery2Name = 'search-query-2';
+    searchQuery2 = `SELECT channel,level,server,time,message,data FROM ${env.postgres_table} WHERE 
+    search @@ plainto_tsquery($1)
+    AND channel = $2
+    AND level BETWEEN $3 AND $4
+    AND time BETWEEN $5 AND $6
+    OFFSET $7 LIMIT $8`;
+
+    searchQuery1CountName = 'search-query-1-count';
+    searchQuery1Count = `SELECT COUNT(*) as count FROM ${env.postgres_table} WHERE 
+    search @@ plainto_tsquery($1)
+    AND channel = $2
+    AND level BETWEEN $3 AND $4
+    AND server IN ($5)
+    AND time BETWEEN $6 AND $7`;
+
+    searchQuery2CountName = 'search-query-2-count';
+    searchQuery2Count = `SELECT COUNT(*) as count FROM ${env.postgres_table} WHERE 
+    search @@ plainto_tsquery($1)
+    AND channel = $2
+    AND level BETWEEN $3 AND $4
+    AND time BETWEEN $5 AND $6`;
+
+
+    async searchDatabase(
+        searchTerm: string,
+        servers: string[] | undefined,
+        channel: string | undefined,
         minimumLevel: number,
         maximumLevel: number,
-        entryCount: number,
-        pageStart: number,
-        pageEnd: number,
-        data: string[]): Promise<number> {
+        minimumTime: number,
+        maximumTime: number,
+        offset: number,
+        pageSize: number): Promise<SearchResult> {
 
-        for (let server of servers) {
-            let basePattern = `server:*${server}*level: [${minimumLevel}-${maximumLevel}]*`;
+        let data: any[];
+        let entryCount: number;
 
-            //SSCAN can return the same values multiple times to we filter them using an object literal
-            let termChecker: Dictionary<boolean> = {};
+        if (servers === undefined) {
+            let parameters1 = [searchTerm, channel, minimumLevel, maximumLevel, minimumTime, maximumTime, offset, pageSize];
+            data = await this.postgresPool.query(this.searchQuery2Name, this.searchQuery2, parameters1);
 
-            for (let searchTerm of searchTerms) {
-                let result: [string, string[]];
-                let cursor = '0';
-                do {
-                    result = await this.SSCAN(setKey, cursor, basePattern + searchTerm + '*');
-                    for (let element of result[1]) {
+            let parameters2 = [searchTerm, channel, minimumLevel, maximumLevel, minimumTime, maximumTime];
+            entryCount = (await this.postgresPool.query(this.searchQuery2CountName, this.searchQuery2Count, parameters2))[0].count;
 
-                        if (entryCount >= pageStart && entryCount < pageEnd && termChecker[element] === undefined) {
-                            termChecker[element] = true;
-                            data.push(element);
-                        }
+        } else {
+            let parameters1 = [searchTerm, channel, minimumLevel, maximumLevel, servers, minimumTime, maximumTime, offset, pageSize];
+            data = await this.postgresPool.query(this.searchQuery1Name, this.searchQuery1, parameters1);
 
-                        if (termChecker[element] === undefined || termChecker[element]) {
-                            termChecker[element] = false;
-                            entryCount++;
-                        }
-                    }
-                } while (result[0] !== '0')
-            }
+            let parameters2 = [searchTerm, channel, minimumLevel, maximumLevel, servers, minimumTime, maximumTime];
+            entryCount = (await this.postgresPool.query(this.searchQuery1CountName, this.searchQuery1Count, parameters2))[0].count;
         }
-        return entryCount;
+
+        return {
+            entryCount,
+            data,
+            pageSize: 0,
+            page: 0
+        };
     }
 }
 
 class SearchParameters {
-    searchTerms: string[] = [];
+    minimumLevel: number = 0;
+    maximumLevel: number = 0;
     intervalStart: number = 0;
     intervalEnd: number = 0;
     page: number = 0;
     pageSize: number = 0;
-    minimumLevel: number = 0;
-    maximumLevel: number = 0;
+    searchTerm: string = '';
     servers: string[] = [];
+    channel: string | undefined;
+}
+
+class SearchResult {
+    entryCount: number = 0;
+    data: any[] = [];
+    pageSize: number = 0;
+    page: number = 0;
 }

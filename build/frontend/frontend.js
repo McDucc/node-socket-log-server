@@ -91,13 +91,18 @@ setInterval(async () => {
             await updateServerList();
             await updateMetrics();
             await syncCharts();
-            if (Alpine.store('controls').autoUpdate) {
-                search(Alpine.store('controls').searchTerm, 0, 10, Alpine.store('controls').page, 25);
-            }
         } catch (err) {
             console.log(err)
         }
 }, 5000);
+
+setInterval(async () => {
+    let nowInSeconds = Math.floor(Date.now() / 1000);
+
+    if (Alpine.store('controls').autoUpdate && nowInSeconds % Alpine.store('controls').autoUpdateSpeed === 0) {
+        search(Alpine.store('controls').searchTerm, 0, 10, Alpine.store('controls').page, 50);
+    }
+})
 
 document.addEventListener('alpine:init', () => {
 
@@ -114,6 +119,7 @@ document.addEventListener('alpine:init', () => {
         showModal: true,
         showServerMetrics: false,
         autoUpdate: false,
+        autoUpdateSpeed: 3,
         metrics,
         timeframeType: 'since',
         page: 0,

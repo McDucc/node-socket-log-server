@@ -7,17 +7,15 @@
   "author": "Robert Gudat",
   "license": "MIT",
   "dependencies": {
-    "@types/redis": "^2.8.31",
-    "redis": "^3.1.2",
-    "uuid": "^8.3.2",
-    "uWebSockets.js": "uNetworking/uWebSockets.js#v20.15.0"
+    "postgres": "gudatr/postgres-pool",
+    "uWebSockets.js": "uNetworking/uWebSockets.js#v20.16.0"
   },
   "devDependencies": {
-    "@types/uuid": "^8.3.3",
-    "@types/ws": "^8.2.2",
+    "@types/node": "^18.11.18",
     "copyfiles": "^2.4.1"
   },
   "scripts": {
-    "start": "tsc && copyfiles -u 1 src/**/*.{html,ico,css,js,map} build/ && node build/app.js"
+    "start": "tsc && copyfiles -u 1 src/**/*.{html,ico,css,js,map} build/ && node build/app.js",
+    "compile": "tsc && copyfiles -u 1 src/**/*.{html,ico,css,js,map} build/"
   }
 }
