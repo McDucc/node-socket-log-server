@@ -2,7 +2,7 @@
 let basicPost = () => {
     return {
         method: 'POST',
-        cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
+        cache: 'no-cache',
         headers: {
             'auth-token': Alpine.store('credentials').password
         }
@@ -52,19 +52,13 @@ async function updateMetrics() {
     try {
         let data = basicPost();
         data.body = JSON.stringify({
-            parameters: {
-                searchTerms: ['*'],
-                intervalStart: getTimestamps(0),
-                intervalEnd: getTimestamps(1),
-                pageSize: 2000,
-                page: 0,
-                minimumLevel: 0,
-                maximumLevel: 0,
-                servers: Alpine.store('log').servers
-            }
+            intervalStart: getTimestamps(0),
+            intervalEnd: getTimestamps(1),
         });
-        let response = await (await fetch('/search', data)).json();
+
+        let response = await (await fetch('/metrics', data)).json();
         let resolution = 20;
+
         if (Array.isArray(response.data)) {
             metricsCompiled = {};
             let index = 0;
@@ -148,19 +142,19 @@ async function search(searchTerm, minimumLevel, maximumLevel, page, pageSize) {
         let data = basicPost();
 
         data.body = JSON.stringify({
-            parameters: {
-                searchTerms: [searchTerm],
-                intervalStart: getTimestamps(0),
-                intervalEnd: getTimestamps(1),
-                pageSize,
-                page,
-                minimumLevel,
-                maximumLevel,
-                servers: Alpine.store('log').servers
-            }
+            searchTerm,
+            intervalStart: getTimestamps(0),
+            intervalEnd: getTimestamps(1),
+            pageSize,
+            page,
+            minimumLevel,
+            maximumLevel,
+            servers: Alpine.store('log').servers
         });
+
         let response = await fetch('/search', data);
         let json = await response.json();
+
         Alpine.store('log').messages = json.data;
         Alpine.store('controls').page = json.page;
         Alpine.store('controls').pageSize = json.pageSize;
@@ -197,7 +191,6 @@ let chartScaleLayout = {
 function makeOrUpdateChart(chartData, chartName, chartLabels, element) {
 
     if (charts[chartName] == undefined) {
-        console.log('Creating chart ' + chartName);
         let context = element.getContext('2d');
         let myChart = new Chart(context, {
             type: 'line',
@@ -228,7 +221,6 @@ function makeOrUpdateChart(chartData, chartName, chartLabels, element) {
         });
         charts[chartName] = myChart;
     } else {
-        console.log('Updating chart ' + chartName);
         charts[chartName].data.datasets[0].data = chartData;
         charts[chartName].data.labels = chartLabels;
         charts[chartName].update();

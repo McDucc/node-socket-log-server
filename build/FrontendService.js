@@ -35,7 +35,7 @@ class FrontEndcontroller extends HasApp_1.default {
         this.searchLockLimit = env_1.env.search_limit;
         this.searchLock = 0;
         this.searchQuery1Name = 'search-query-1';
-        this.searchQuery1 = `SELECT channel,level,server,time,message,data FROM ${env_1.env.postgres_table} WHERE 
+        this.searchQuery1 = `SELECT level,server,time,message,data FROM ${env_1.env.postgres_table} WHERE 
     search @@ plainto_tsquery($1)
     AND channel = $2
     AND level BETWEEN $3 AND $4
@@ -43,7 +43,7 @@ class FrontEndcontroller extends HasApp_1.default {
     AND time BETWEEN $6 AND $7
     OFFSET $8 LIMIT $9`;
         this.searchQuery2Name = 'search-query-2';
-        this.searchQuery2 = `SELECT channel,level,server,time,message,data FROM ${env_1.env.postgres_table} WHERE 
+        this.searchQuery2 = `SELECT level,server,time,message,data FROM ${env_1.env.postgres_table} WHERE 
     search @@ plainto_tsquery($1)
     AND channel = $2
     AND level BETWEEN $3 AND $4
@@ -62,8 +62,14 @@ class FrontEndcontroller extends HasApp_1.default {
     AND channel = $2
     AND level BETWEEN $3 AND $4
     AND time BETWEEN $5 AND $6`;
+        this.metricsQueryName = 'search-query-2-count';
+        this.metricsQuery = `SELECT server,time,data FROM ${env_1.env.postgres_table} WHERE 
+    channel = 'metrics'
+    AND level = 0
+    AND time BETWEEN $1 AND $2`;
         this.postgresPool = (0, PostgresSetup_1.default)();
         this.bind('post', '/search', this.search);
+        this.bind('post', '/metrics', this.searchMetrics);
         this.bind('post', '/auth', this.authTest);
         this.bind('post', '/servers', this.getServers);
         ['app.html',
@@ -131,7 +137,10 @@ class FrontEndcontroller extends HasApp_1.default {
             parameters.minimumLevel > parameters.maximumLevel ||
             !Array.isArray(parameters.servers);
     }
-    async search(request, response) {
+    async searchMetrics(request, response) {
+        await this.search(request, response, 'metrics');
+    }
+    async search(request, response, mode = 'database') {
         if (request.headers['auth-token'] != env_1.env.logger_password) {
             return response.end('Unauthenticated');
         }
@@ -141,26 +150,11 @@ class FrontEndcontroller extends HasApp_1.default {
         try {
             this.searchLock++;
             let parametersRaw = JSON.parse(request.data);
-            if (this.parametersInvalid(parametersRaw)) {
-                response.writeStatus('400 Bad Request');
-                response.end('Parameters are not within acceptable ranges');
-                return;
+            if (mode === 'metrics') {
+                await this.metricsSearch(parametersRaw, response);
             }
             else {
-                let parameters = parametersRaw;
-                let offset = parameters.page * parameters.pageSize;
-                let limit = parameters.pageSize;
-                let now = Date.now();
-                let intervalEnd = now - parameters.intervalEnd * 60000;
-                let intervalStart = now - parameters.intervalStart * 60000;
-                if (typeof parameters.searchTerm !== 'string') {
-                    parameters.searchTerm = JSON.stringify(parameters.searchTerm);
-                }
-                let data = await this.searchDatabase(parameters.searchTerm, parameters.servers, parameters.channel, parameters.minimumLevel, parameters.maximumLevel, intervalEnd, intervalStart, offset, limit);
-                data.pageSize = parameters.pageSize;
-                data.page = parameters.page;
-                response.writeStatus('200 OK');
-                response.end(JSON.stringify(data));
+                await this.databaseSearch(parametersRaw, response);
             }
         }
         catch (err) {
@@ -176,7 +170,48 @@ class FrontEndcontroller extends HasApp_1.default {
             this.searchLock--;
         }
     }
-    async searchDatabase(searchTerm, servers, channel, minimumLevel, maximumLevel, minimumTime, maximumTime, offset, pageSize) {
+    async databaseSearch(parametersRaw, response) {
+        if (this.parametersInvalid(parametersRaw)) {
+            response.writeStatus('400 Bad Request');
+            response.end('Parameters are not within acceptable ranges');
+            return;
+        }
+        else {
+            let parameters = parametersRaw;
+            let offset = parameters.page * parameters.pageSize;
+            let limit = parameters.pageSize;
+            let now = Date.now();
+            let intervalEnd = now - parameters.intervalEnd * 60000;
+            let intervalStart = now - parameters.intervalStart * 60000;
+            if (typeof parameters.searchTerm !== 'string') {
+                parameters.searchTerm = JSON.stringify(parameters.searchTerm);
+            }
+            let data = await this.databaseLookup(parameters.searchTerm, parameters.servers, parameters.channel, parameters.minimumLevel, parameters.maximumLevel, intervalEnd, intervalStart, offset, limit);
+            data.pageSize = parameters.pageSize;
+            data.page = parameters.page;
+            response.writeStatus('200 OK');
+            response.end(JSON.stringify(data));
+        }
+    }
+    async metricsSearch(parametersRaw, response) {
+        let parameters = parametersRaw;
+        let now = Date.now();
+        let intervalEnd = now - parameters.intervalEnd * 60000;
+        let intervalStart = now - parameters.intervalStart * 60000;
+        let data = await this.metricsLookup(intervalEnd, intervalStart);
+        response.writeStatus('200 OK');
+        response.end(JSON.stringify(data));
+    }
+    async metricsLookup(minimumTime, maximumTime) {
+        let data = await this.postgresPool.query(this.metricsQueryName, this.metricsQuery, [minimumTime, maximumTime]);
+        return {
+            data,
+            entryCount: 0,
+            page: 0,
+            pageSize: 0
+        };
+    }
+    async databaseLookup(searchTerm, servers, channel, minimumLevel, maximumLevel, minimumTime, maximumTime, offset, pageSize) {
         let data;
         let entryCount;
         if (servers === undefined) {
@@ -210,6 +245,12 @@ class SearchParameters {
         this.pageSize = 0;
         this.searchTerm = '';
         this.servers = [];
+    }
+}
+class MetricsParameters {
+    constructor() {
+        this.intervalStart = 0;
+        this.intervalEnd = 0;
     }
 }
 class SearchResult {

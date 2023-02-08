@@ -20,11 +20,11 @@
             <button class="btn btn-primary" @click=" $store.controls.showModal=false; authenticate();">Close</button>
         </div>
     </div>
-    <div class="col-md-11 mt-3" style="margin: auto; ">
+    <div class="col-md-11 mt-3 m-auto">
         <a class="title-x">Node</a>
         <a class="title-x blue-text">Socket</a>
         <a class="title-x">Logger</a>
-        <div class="bd-example row col-md-12 mt-4" style="margin: auto;">
+        <div class="bd-example row col-md-12 mt-4 m-auto">
             <div class="row mt-2">
                 <div class="col-md-12">
                     <button class="alert btn btn-primary float-start"
@@ -92,56 +92,33 @@
                 </div>
             </div>
         </div>
-        <div class="bd-example row col-md-12 mt-4" style="margin: auto; font-size: 15px; font-family: monospace;"
-            x-show="$store.controls.showServerMetrics">
+        
+        <div class="bd-example row col-md-12 mt-4 alx-messages" x-show="$store.controls.showServerMetrics">
             <template x-for="server in $store.log.servers">
                 <div class="bd-example col-md-12 mt-2">
-                    <div x-text="server.name" style="text-align: center;"></div>
+                    <div x-text="server.name" class="text-center"></div>
                     <template x-for="metric in $store.controls.metrics">
-                        <div style="padding: 5px;" class="col-md-3 float-start">
+                        <div class="col-md-3 float-start p-5">
                             <canvas class="metric-canvas" :id="server.name + ': ' + metric"></canvas>
                         </div>
                     </template>
                 </div>
             </template>
         </div>
-        <div class="bd-example row col-md-12 mt-4" style="margin: auto; font-size: 15px; font-family: monospace;"
-            x-show="!$store.controls.showServerMetrics">
-            <div class="btn btn-primary alx">
-                &lt;
-            </div>
-            <div class="btn btn-primary alx">
-                1
-            </div>
-            <div class="btn btn-primary alx">
-                ...
-            </div>
-            <div class="btn btn-primary alx">
-                12
-            </div>
-            <div class="btn btn-primary alx">
-                ...
-            </div>
-            <div class="btn btn-primary alx">
-                23
-            </div>
-            <div class="btn btn-primary alx">
-                &gt;
-            </div>
-            <div class="alert alert-dark alm">
-                <b>Datetime:</b> 2021-08-01 00:00:00.333<br>
-                <b>Message:</b> Example Message Example Message<br>
-                <b>Level:</b> Info<br>
-                <b>Server:</b> Server 4<br>
-                <b>Data:</b><br> Example Message Example Message<br>
-            </div>
-            <div class="alert alert-danger">
-                <b>Datetime:</b> 2021-08-01 00:00:00.333<br>
-                <b>Message:</b> Example Message Example Message<br>
-                <b>Level:</b> Critical<br>
-                <b>Server:</b> Server 4<br>
-                <b>Data:</b><br> Example Message Example Message<br>
-            </div>
+
+        <div class="bd-example row col-md-12 mt-4 alx-messages" x-show="!$store.controls.showServerMetrics">
+            <template x-for="i in $store.log.pages">
+                <div class="btn btn-primary alx" x-text="i"></div>
+            </template>
+            <template x-for="message in $store.log.messages">
+                <div class="alert alert-dark alm">
+                    <b>Datetime:</b> <span x-text="message.time"></span><br>
+                    <b>Message:</b> <span x-text="message.message"></span><br>
+                    <b>Level:</b> <span x-text="message.level"></span><br>
+                    <b>Server:</b> <span x-text="message.server"></span><br>
+                    <b>Data:</b><br> <span x-text="message.data"></span><br>
+                </div>
+            </template>
         </div>
     </div>
 </body>

@@ -23,6 +23,7 @@ export default class FrontEndcontroller extends HasApp {
         this.postgresPool = SetupPostgresPool();
 
         this.bind('post', '/search', this.search);
+        this.bind('post', '/metrics', this.searchMetrics);
         this.bind('post', '/auth', this.authTest);
         this.bind('post', '/servers', this.getServers);
 
@@ -109,8 +110,12 @@ export default class FrontEndcontroller extends HasApp {
             !Array.isArray(parameters.servers);
     }
 
+    async searchMetrics(request: RequestData, response: HttpResponse) {
+        await this.search(request, response, 'metrics');
+    }
 
-    async search(request: RequestData, response: HttpResponse) {
+
+    async search(request: RequestData, response: HttpResponse, mode: 'metrics' | 'database' = 'database') {
         if (request.headers['auth-token'] != env.logger_password) {
             return response.end('Unauthenticated');
         }
@@ -123,13 +128,11 @@ export default class FrontEndcontroller extends HasApp {
             this.searchLock++;
             let parametersRaw = JSON.parse(request.data);
 
-            if ((request.headers['mode'] ?? 'search') === 'metrics') {
-
+            if (mode === 'metrics') {
+                await this.metricsSearch(parametersRaw, response);
             } else {
                 await this.databaseSearch(parametersRaw, response);
             }
-
-            await this.databaseSearch(parametersRaw, response);
         } catch (err: any) {
             let res = JSON.stringify({
                 message: err.message,
@@ -196,7 +199,7 @@ export default class FrontEndcontroller extends HasApp {
     }
 
     searchQuery1Name = 'search-query-1';
-    searchQuery1 = `SELECT channel,level,server,time,message,data FROM ${env.postgres_table} WHERE 
+    searchQuery1 = `SELECT level,server,time,message,data FROM ${env.postgres_table} WHERE 
     search @@ plainto_tsquery($1)
     AND channel = $2
     AND level BETWEEN $3 AND $4
@@ -205,7 +208,7 @@ export default class FrontEndcontroller extends HasApp {
     OFFSET $8 LIMIT $9`;
 
     searchQuery2Name = 'search-query-2';
-    searchQuery2 = `SELECT channel,level,server,time,message,data FROM ${env.postgres_table} WHERE 
+    searchQuery2 = `SELECT level,server,time,message,data FROM ${env.postgres_table} WHERE 
     search @@ plainto_tsquery($1)
     AND channel = $2
     AND level BETWEEN $3 AND $4
@@ -228,8 +231,8 @@ export default class FrontEndcontroller extends HasApp {
     AND time BETWEEN $5 AND $6`;
 
     metricsQueryName = 'search-query-2-count';
-    metricsQuery = `SELECT level,server,time,data FROM ${env.postgres_table} WHERE 
-    AND channel = metrics
+    metricsQuery = `SELECT server,time,data FROM ${env.postgres_table} WHERE 
+    channel = 'metrics'
     AND level = 0
     AND time BETWEEN $1 AND $2`;
 

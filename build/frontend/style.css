@@ -3,7 +3,7 @@
     border-color: #07429b;
 }
 
-.blue-text{
+.blue-text {
     color: #07429b;
 }
 
@@ -76,12 +76,18 @@
     z-index: 99;
 }
 
-.body-base{
+.body-base {
     background-color: #19222b;
     color: #dee2e6;
 }
 
-.title-x{
+.alx-messages {
+    margin: auto;
+    font-size: 15px;
+    font-family: monospace;
+}
+
+.title-x {
     color: #dee2e6;
     text-decoration: none;
     font-size: xx-large;

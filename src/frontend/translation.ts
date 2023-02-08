@@ -18,6 +18,6 @@ function initializeTranslation(Alpine: any) {
     });
 
     return (index: string) => {
-        return Alpine.store('lang')[Alpine.store('lang').current][index] ?? 'Translation missing: ' + index;
+        return Alpine.store('lang')[Alpine.store('lang').current][index] ?? index;
     }
 }
