@@ -1,0 +1,95 @@
+.btn-primary {
+    background-color: #07429b;
+    border-color: #07429b;
+}
+
+.blue-text {
+    color: #07429b;
+}
+
+.alert-danger {
+    color: #dee2e6;
+    background-color: #80343a;
+}
+
+.alm {
+    background-color: #414549;
+    color: #dee2e6;
+}
+
+.alx {
+    background-color: #07429b;
+    color: #dee2e6;
+    width: auto !important;
+    margin-bottom: 2em !important;
+    margin-right: 0.25em !important;
+}
+
+.bd-example {
+    position: relative;
+    padding: 1rem;
+    margin: 1rem -.75rem 0;
+    border: solid #dee2e6;
+    border-width: 1px 0 0
+}
+
+.bd-example::after {
+    display: block;
+    clear: both;
+    content: ""
+}
+
+@media (min-width: 576px) {
+    .bd-example {
+        padding: 1.5rem;
+        margin-right: 0;
+        margin-left: 0;
+        border-width: 1px;
+        border-top-left-radius: .25rem;
+        border-top-right-radius: .25rem
+    }
+}
+
+.bd-example+p {
+    margin-top: 2rem
+}
+
+.modalx {
+    z-index: 100;
+    width: 400px;
+    height: 200px;
+    position: absolute;
+    left: 50%;
+    top: 200;
+    margin-left: -180px;
+    margin-top: -150px;
+    padding: 15px;
+    background-color: rgb(33, 33, 33);
+}
+
+.modal-overlay {
+    background: #19222b;
+    opacity: 0.5;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    z-index: 99;
+}
+
+.body-base {
+    background-color: #19222b;
+    color: #dee2e6;
+}
+
+.alx-messages {
+    margin: auto;
+    font-size: 15px;
+    font-family: monospace;
+}
+
+.title-x {
+    color: #dee2e6;
+    text-decoration: none;
+    font-size: xx-large;
+    font-weight: bold;
+}
