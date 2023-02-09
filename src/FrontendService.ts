@@ -1,5 +1,5 @@
 import RequestData from './RequestData';
-import { HttpResponse } from "uWebSockets.js";
+import { HttpResponse, RecognizedString } from "uWebSockets.js";
 import { Dictionary } from "./RequestData";
 import HasApp from './HasApp';
 import * as fs from "fs";
@@ -7,6 +7,12 @@ import { env } from './env';
 import path from 'path';
 import Postgres from 'postgres';
 import SetupPostgresPool from './PostgresSetup';
+
+function EndReponse(response: HttpResponse, data: RecognizedString, closeConnection: boolean = false) {
+    if (!response.ended) {
+        response.end(data, closeConnection)
+    }
+}
 
 export default class FrontEndcontroller extends HasApp {
 
@@ -30,10 +36,7 @@ export default class FrontEndcontroller extends HasApp {
         ['app.html',
             'favicon.ico',
             'style.css',
-            'bootstrap.css',
-            'bootstrap.css.map',
             'translation.js',
-            'alpine.js',
             'frontend.js'].forEach((element) => {
                 this.serveFile(element);
             });
@@ -48,7 +51,7 @@ export default class FrontEndcontroller extends HasApp {
         handler = handler.bind(this);
 
         this.app[method](routePattern, (response, request) => {
-            response.onAborted(this.onAbortNoAction);
+            response.onAborted(() => { response.ended = true });
 
             let headers: Dictionary<string> = {};
 
@@ -75,22 +78,29 @@ export default class FrontEndcontroller extends HasApp {
         this.bind('get', '/' + file, (request: RequestData, response: HttpResponse) => {
             fs.readFile(filePath, (err, data) => {
                 if (err) console.log(err);
-                response.end(data);
+                EndReponse(response, data);
             });
         });
     }
 
     authTest(request: RequestData, response: HttpResponse) {
         if (request.headers['auth-token'] != env.logger_password) {
-            return response.end('Unauthenticated');
+            return EndReponse(response, 'Unauthenticated');
         }
 
-        return response.end('Authenticated');
+        return EndReponse(response, 'Authenticated');
     }
 
     async getServers(request: RequestData, response: HttpResponse) {
+
+        console.log("getting servers");
+
+        await new Promise(res => {
+            setTimeout(res, 10000);
+        });
+
         if (request.headers['auth-token'] != env.logger_password) {
-            return response.end('Unauthenticated');
+            return EndReponse(response, 'Unauthenticated');
         }
 
         let query = await this.postgresPool.query("get-servers", "SELECT DISTINCT server from logs", []);
@@ -98,7 +108,7 @@ export default class FrontEndcontroller extends HasApp {
             return entry.server;
         });
 
-        response.end(JSON.stringify(data));
+        EndReponse(response, JSON.stringify(data));
     }
 
     parametersInvalid(parameters: any) {
@@ -117,11 +127,11 @@ export default class FrontEndcontroller extends HasApp {
 
     async search(request: RequestData, response: HttpResponse, mode: 'metrics' | 'database' = 'database') {
         if (request.headers['auth-token'] != env.logger_password) {
-            return response.end('Unauthenticated');
+            return EndReponse(response, 'Unauthenticated');
         }
 
         if (this.searchLock >= this.searchLockLimit) {
-            return response.end('Locked');
+            return EndReponse(response, 'Locked');
         }
 
         try {
@@ -139,7 +149,7 @@ export default class FrontEndcontroller extends HasApp {
                 stack: err.stack,
             });
             response.writeStatus('500 Internal Server Error');
-            response.end(res);
+            EndReponse(response, res);
             console.log(res);
         } finally {
             this.searchLock--;
@@ -149,17 +159,11 @@ export default class FrontEndcontroller extends HasApp {
     async databaseSearch(parametersRaw: any, response: HttpResponse) {
         if (this.parametersInvalid(parametersRaw)) {
             response.writeStatus('400 Bad Request');
-            response.end('Parameters are not within acceptable ranges');
+            EndReponse(response, 'Parameters are not within acceptable ranges');
             return;
         } else {
             let parameters: SearchParameters = parametersRaw;
-            let offset = parameters.page * parameters.pageSize;
-            let limit = parameters.pageSize;
-            let now = Date.now();
-            //Translate minutes to milliseconds and set the intervals relative to the current time
-            let intervalEnd = now - parameters.intervalEnd * 60000;
-            let intervalStart = now - parameters.intervalStart * 60000;
-
+            
             if (typeof parameters.searchTerm !== 'string') {
                 parameters.searchTerm = JSON.stringify(parameters.searchTerm);
             }
@@ -170,32 +174,28 @@ export default class FrontEndcontroller extends HasApp {
                 parameters.channel,
                 parameters.minimumLevel,
                 parameters.maximumLevel,
-                intervalEnd,
-                intervalStart,
-                offset,
-                limit);
+                parameters.intervalEnd,
+                parameters.intervalStart,
+                parameters.page * parameters.pageSize,
+                parameters.pageSize);
 
             data.pageSize = parameters.pageSize;
             data.page = parameters.page;
 
             response.writeStatus('200 OK');
-            response.end(JSON.stringify(data));
+            EndReponse(response, JSON.stringify(data));
         }
     }
 
     async metricsSearch(parametersRaw: any, response: HttpResponse) {
         let parameters: MetricsParameters = parametersRaw;
-        let now = Date.now();
-        //Translate minutes to milliseconds and set the intervals relative to the current time
-        let intervalEnd = now - parameters.intervalEnd * 60000;
-        let intervalStart = now - parameters.intervalStart * 60000;
 
         let data = await this.metricsLookup(
-            intervalEnd,
-            intervalStart);
+            parameters.intervalEnd,
+            parameters.intervalStart);
 
         response.writeStatus('200 OK');
-        response.end(JSON.stringify(data));
+        EndReponse(response, JSON.stringify(data));
     }
 
     searchQuery1Name = 'search-query-1';

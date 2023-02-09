@@ -28,6 +28,11 @@ const fs = __importStar(require("fs"));
 const env_1 = require("./env");
 const path_1 = __importDefault(require("path"));
 const PostgresSetup_1 = __importDefault(require("./PostgresSetup"));
+function EndReponse(response, data, closeConnection = false) {
+    if (!response.ended) {
+        response.end(data, closeConnection);
+    }
+}
 class FrontEndcontroller extends HasApp_1.default {
     constructor() {
         super(env_1.env.frontend_port);
@@ -75,10 +80,7 @@ class FrontEndcontroller extends HasApp_1.default {
         ['app.html',
             'favicon.ico',
             'style.css',
-            'bootstrap.css',
-            'bootstrap.css.map',
             'translation.js',
-            'alpine.js',
             'frontend.js'].forEach((element) => {
             this.serveFile(element);
         });
@@ -87,7 +89,7 @@ class FrontEndcontroller extends HasApp_1.default {
     bind(method, routePattern, handler) {
         handler = handler.bind(this);
         this.app[method](routePattern, (response, request) => {
-            response.onAborted(this.onAbortNoAction);
+            response.onAborted(() => { response.ended = false; });
             let headers = {};
             request.forEach((headerKey, headerValue) => {
                 headers[headerKey] = headerValue;
@@ -109,25 +111,29 @@ class FrontEndcontroller extends HasApp_1.default {
             fs.readFile(filePath, (err, data) => {
                 if (err)
                     console.log(err);
-                response.end(data);
+                EndReponse(response, data);
             });
         });
     }
     authTest(request, response) {
         if (request.headers['auth-token'] != env_1.env.logger_password) {
-            return response.end('Unauthenticated');
+            return EndReponse(response, 'Unauthenticated');
         }
-        return response.end('Authenticated');
+        return EndReponse(response, 'Authenticated');
     }
     async getServers(request, response) {
+        console.log("getting servers");
+        await new Promise(res => {
+            setTimeout(res, 10000);
+        });
         if (request.headers['auth-token'] != env_1.env.logger_password) {
-            return response.end('Unauthenticated');
+            return EndReponse(response, 'Unauthenticated');
         }
         let query = await this.postgresPool.query("get-servers", "SELECT DISTINCT server from logs", []);
         let data = query.map(entry => {
             return entry.server;
         });
-        response.end(JSON.stringify(data));
+        EndReponse(response, JSON.stringify(data));
     }
     parametersInvalid(parameters) {
         return parameters.intervalStart == 0 && parameters.intervalEnd == 0 ||
@@ -142,10 +148,10 @@ class FrontEndcontroller extends HasApp_1.default {
     }
     async search(request, response, mode = 'database') {
         if (request.headers['auth-token'] != env_1.env.logger_password) {
-            return response.end('Unauthenticated');
+            return EndReponse(response, 'Unauthenticated');
         }
         if (this.searchLock >= this.searchLockLimit) {
-            return response.end('Locked');
+            return EndReponse(response, 'Locked');
         }
         try {
             this.searchLock++;
@@ -163,7 +169,7 @@ class FrontEndcontroller extends HasApp_1.default {
                 stack: err.stack,
             });
             response.writeStatus('500 Internal Server Error');
-            response.end(res);
+            EndReponse(response, res);
             console.log(res);
         }
         finally {
@@ -173,7 +179,7 @@ class FrontEndcontroller extends HasApp_1.default {
     async databaseSearch(parametersRaw, response) {
         if (this.parametersInvalid(parametersRaw)) {
             response.writeStatus('400 Bad Request');
-            response.end('Parameters are not within acceptable ranges');
+            EndReponse(response, 'Parameters are not within acceptable ranges');
             return;
         }
         else {
@@ -190,7 +196,7 @@ class FrontEndcontroller extends HasApp_1.default {
             data.pageSize = parameters.pageSize;
             data.page = parameters.page;
             response.writeStatus('200 OK');
-            response.end(JSON.stringify(data));
+            EndReponse(response, JSON.stringify(data));
         }
     }
     async metricsSearch(parametersRaw, response) {
@@ -200,7 +206,7 @@ class FrontEndcontroller extends HasApp_1.default {
         let intervalStart = now - parameters.intervalStart * 60000;
         let data = await this.metricsLookup(intervalEnd, intervalStart);
         response.writeStatus('200 OK');
-        response.end(JSON.stringify(data));
+        EndReponse(response, JSON.stringify(data));
     }
     async metricsLookup(minimumTime, maximumTime) {
         let data = await this.postgresPool.query(this.metricsQueryName, this.metricsQuery, [minimumTime, maximumTime]);

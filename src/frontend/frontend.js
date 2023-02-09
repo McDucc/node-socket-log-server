@@ -30,19 +30,19 @@ const traffic_in = 'tin';
 const traffic_out = 'tout';
 const metrics = [cpu_load, ram_used, disk_read, disk_write, disk_used, traffic_in, traffic_out];
 
-function getTimestamps(timestamp) {
-    if (timestamp == 0) {
-        timestamp = Alpine.store('controls').timeSelect;
-        timefield = Alpine.store('controls').datetime1;
+function getTimestamps(fieldIndex) {
+
+    if (fieldIndex == 0) {
+        if (Alpine.store('controls').timeframeType == 'since') {
+            //Return relative time
+            return now() - parseInt(Alpine.store('controls').timeSelect) * 1000;
+        }
+        field = Alpine.store('controls').datetime1;
     } else {
-        timefield = Alpine.store('controls').datetime2;
+        field = Alpine.store('controls').datetime2;
     }
 
-    if (Alpine.store('controls').timeframeType == 'since') {
-        return timestamp;
-    } else {
-        (Date.now() - new Date(timefield).getTime()) / millisecondToMinute;
-    }
+    return new Date(field).getTime();
 }
 
 let updatingMetrics = false;
@@ -91,12 +91,14 @@ setInterval(async () => {
 }, 5000);
 
 setInterval(async () => {
+    if (typeof Alpine === 'undefined') return;
+
     let nowInSeconds = Math.floor(Date.now() / 1000);
 
     if (Alpine.store('controls').autoUpdate && nowInSeconds % Alpine.store('controls').autoUpdateSpeed === 0) {
-        search(Alpine.store('controls').searchTerm, 0, 10, Alpine.store('controls').page, 50);
+        search(Alpine.store('controls').searchTerm, 0, 10, Alpine.store('controls').page, 100);
     }
-})
+}, 333)
 
 document.addEventListener('alpine:init', () => {
 
@@ -109,7 +111,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.store('controls', {
         datetime1: new Date().toISOString().split('.')[0],
         datetime2: new Date().toISOString().split('.')[0],
-        timeSelect: '2',
+        timeSelect: 2,
         showModal: true,
         showServerMetrics: false,
         autoUpdate: false,

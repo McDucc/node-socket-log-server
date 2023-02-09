@@ -91,12 +91,14 @@ setInterval(async () => {
 }, 5000);
 
 setInterval(async () => {
+    if (typeof Alpine === 'undefined') return;
+
     let nowInSeconds = Math.floor(Date.now() / 1000);
 
     if (Alpine.store('controls').autoUpdate && nowInSeconds % Alpine.store('controls').autoUpdateSpeed === 0) {
-        search(Alpine.store('controls').searchTerm, 0, 10, Alpine.store('controls').page, 50);
+        search(Alpine.store('controls').searchTerm, 0, 10, Alpine.store('controls').page, 100);
     }
-})
+}, 333)
 
 document.addEventListener('alpine:init', () => {
 
