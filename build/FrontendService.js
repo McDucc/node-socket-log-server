@@ -42,7 +42,7 @@ class FrontEndcontroller extends HasApp_1.default {
         this.searchQuery1Name = 'search-query-1';
         this.searchQuery1 = `SELECT level,server,time,message,data FROM ${env_1.env.postgres_table} WHERE 
     search @@ plainto_tsquery($1)
-    AND channel = $2
+    AND channel IN ($2)
     AND level BETWEEN $3 AND $4
     AND server IN ($5)
     AND time BETWEEN $6 AND $7
@@ -50,21 +50,21 @@ class FrontEndcontroller extends HasApp_1.default {
         this.searchQuery2Name = 'search-query-2';
         this.searchQuery2 = `SELECT level,server,time,message,data FROM ${env_1.env.postgres_table} WHERE 
     search @@ plainto_tsquery($1)
-    AND channel = $2
+    AND channel IN ($2)
     AND level BETWEEN $3 AND $4
     AND time BETWEEN $5 AND $6
     OFFSET $7 LIMIT $8`;
         this.searchQuery1CountName = 'search-query-1-count';
         this.searchQuery1Count = `SELECT COUNT(*) as count FROM ${env_1.env.postgres_table} WHERE 
     search @@ plainto_tsquery($1)
-    AND channel = $2
+    AND channel IN ($2)
     AND level BETWEEN $3 AND $4
     AND server IN ($5)
     AND time BETWEEN $6 AND $7`;
         this.searchQuery2CountName = 'search-query-2-count';
         this.searchQuery2Count = `SELECT COUNT(*) as count FROM ${env_1.env.postgres_table} WHERE 
     search @@ plainto_tsquery($1)
-    AND channel = $2
+    AND channel IN $2
     AND level BETWEEN $3 AND $4
     AND time BETWEEN $5 AND $6`;
         this.metricsQueryName = 'search-query-2-count';
@@ -77,6 +77,7 @@ class FrontEndcontroller extends HasApp_1.default {
         this.bind('post', '/metrics', this.searchMetrics);
         this.bind('post', '/auth', this.authTest);
         this.bind('post', '/servers', this.getServers);
+        this.bind('post', '/channels', this.getChannels);
         ['app.html',
             'favicon.ico',
             'style.css',
@@ -89,7 +90,7 @@ class FrontEndcontroller extends HasApp_1.default {
     bind(method, routePattern, handler) {
         handler = handler.bind(this);
         this.app[method](routePattern, (response, request) => {
-            response.onAborted(() => { response.ended = false; });
+            response.onAborted(() => { response.ended = true; });
             let headers = {};
             request.forEach((headerKey, headerValue) => {
                 headers[headerKey] = headerValue;
@@ -122,24 +123,33 @@ class FrontEndcontroller extends HasApp_1.default {
         return EndReponse(response, 'Authenticated');
     }
     async getServers(request, response) {
-        console.log("getting servers");
-        await new Promise(res => {
-            setTimeout(res, 10000);
-        });
         if (request.headers['auth-token'] != env_1.env.logger_password) {
             return EndReponse(response, 'Unauthenticated');
         }
-        let query = await this.postgresPool.query("get-servers", "SELECT DISTINCT server from logs", []);
+        let query = await this.postgresPool.query("get-servers", "SELECT DISTINCT server from logs ORDER BY server DESC", []);
         let data = query.map(entry => {
             return entry.server;
         });
         EndReponse(response, JSON.stringify(data));
     }
+    async getChannels(request, response) {
+        if (request.headers['auth-token'] != env_1.env.logger_password) {
+            return EndReponse(response, 'Unauthenticated');
+        }
+        let data = await this.getChannelArray();
+        EndReponse(response, JSON.stringify(data));
+    }
+    async getChannelArray() {
+        let query = await this.postgresPool.query("get-channels", "SELECT DISTINCT channel from logs ORDER BY channel DESC", []);
+        let data = query.map(entry => {
+            return entry.channel;
+        });
+        return data;
+    }
     parametersInvalid(parameters) {
         return parameters.intervalStart == 0 && parameters.intervalEnd == 0 ||
-            parameters.intervalStart < parameters.intervalEnd ||
             parameters.page < 0 ||
-            parameters.pageSize < 0 ||
+            parameters.pageSize < 1 ||
             parameters.minimumLevel > parameters.maximumLevel ||
             !Array.isArray(parameters.servers);
     }
@@ -155,12 +165,12 @@ class FrontEndcontroller extends HasApp_1.default {
         }
         try {
             this.searchLock++;
-            let parametersRaw = JSON.parse(request.data);
+            let data = JSON.parse(request.data);
             if (mode === 'metrics') {
-                await this.metricsSearch(parametersRaw, response);
+                await this.metricsSearch(data, response);
             }
             else {
-                await this.databaseSearch(parametersRaw, response);
+                await this.databaseSearch(data, response);
             }
         }
         catch (err) {
@@ -170,7 +180,6 @@ class FrontEndcontroller extends HasApp_1.default {
             });
             response.writeStatus('500 Internal Server Error');
             EndReponse(response, res);
-            console.log(res);
         }
         finally {
             this.searchLock--;
@@ -178,21 +187,17 @@ class FrontEndcontroller extends HasApp_1.default {
     }
     async databaseSearch(parametersRaw, response) {
         if (this.parametersInvalid(parametersRaw)) {
+            console.log(parametersRaw);
             response.writeStatus('400 Bad Request');
             EndReponse(response, 'Parameters are not within acceptable ranges');
             return;
         }
         else {
             let parameters = parametersRaw;
-            let offset = parameters.page * parameters.pageSize;
-            let limit = parameters.pageSize;
-            let now = Date.now();
-            let intervalEnd = now - parameters.intervalEnd * 60000;
-            let intervalStart = now - parameters.intervalStart * 60000;
             if (typeof parameters.searchTerm !== 'string') {
                 parameters.searchTerm = JSON.stringify(parameters.searchTerm);
             }
-            let data = await this.databaseLookup(parameters.searchTerm, parameters.servers, parameters.channel, parameters.minimumLevel, parameters.maximumLevel, intervalEnd, intervalStart, offset, limit);
+            let data = await this.databaseLookup(parameters.searchTerm, parameters.servers, parameters.channels, parameters.minimumLevel, parameters.maximumLevel, parameters.intervalEnd, parameters.intervalStart, parameters.page * parameters.pageSize, parameters.pageSize);
             data.pageSize = parameters.pageSize;
             data.page = parameters.page;
             response.writeStatus('200 OK');
@@ -201,10 +206,7 @@ class FrontEndcontroller extends HasApp_1.default {
     }
     async metricsSearch(parametersRaw, response) {
         let parameters = parametersRaw;
-        let now = Date.now();
-        let intervalEnd = now - parameters.intervalEnd * 60000;
-        let intervalStart = now - parameters.intervalStart * 60000;
-        let data = await this.metricsLookup(intervalEnd, intervalStart);
+        let data = await this.metricsLookup(parameters.intervalEnd, parameters.intervalStart);
         response.writeStatus('200 OK');
         EndReponse(response, JSON.stringify(data));
     }
@@ -217,19 +219,22 @@ class FrontEndcontroller extends HasApp_1.default {
             pageSize: 0
         };
     }
-    async databaseLookup(searchTerm, servers, channel, minimumLevel, maximumLevel, minimumTime, maximumTime, offset, pageSize) {
+    async databaseLookup(searchTerm, servers, channels, minimumLevel, maximumLevel, minimumTime, maximumTime, offset, pageSize) {
         let data;
         let entryCount;
+        if (channels === undefined) {
+            channels = await this.getChannelArray();
+        }
         if (servers === undefined) {
-            let parameters1 = [searchTerm, channel, minimumLevel, maximumLevel, minimumTime, maximumTime, offset, pageSize];
+            let parameters1 = [searchTerm, channels, minimumLevel, maximumLevel, minimumTime, maximumTime, offset, pageSize];
             data = await this.postgresPool.query(this.searchQuery2Name, this.searchQuery2, parameters1);
-            let parameters2 = [searchTerm, channel, minimumLevel, maximumLevel, minimumTime, maximumTime];
+            let parameters2 = [searchTerm, channels, minimumLevel, maximumLevel, minimumTime, maximumTime];
             entryCount = (await this.postgresPool.query(this.searchQuery2CountName, this.searchQuery2Count, parameters2))[0].count;
         }
         else {
-            let parameters1 = [searchTerm, channel, minimumLevel, maximumLevel, servers, minimumTime, maximumTime, offset, pageSize];
+            let parameters1 = [searchTerm, channels, minimumLevel, maximumLevel, servers, minimumTime, maximumTime, offset, pageSize];
             data = await this.postgresPool.query(this.searchQuery1Name, this.searchQuery1, parameters1);
-            let parameters2 = [searchTerm, channel, minimumLevel, maximumLevel, servers, minimumTime, maximumTime];
+            let parameters2 = [searchTerm, channels, minimumLevel, maximumLevel, servers, minimumTime, maximumTime];
             entryCount = (await this.postgresPool.query(this.searchQuery1CountName, this.searchQuery1Count, parameters2))[0].count;
         }
         return {

@@ -5,9 +5,7 @@ export default class RequestData {
     constructor(
         public headers: Dictionary<string>,
         public data: string,
-    ) {
-        this.data = Buffer.from(data).toString();
-    }
+    ) { }
 }
 
 /**

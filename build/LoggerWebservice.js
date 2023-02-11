@@ -23,7 +23,6 @@ class LoggerWebservice extends HasApp_1.default {
             compression: uWebSockets_js_1.DEDICATED_COMPRESSOR_16KB,
             upgrade: (res, req, context) => {
                 let parameters = new url_1.URLSearchParams(req.getQuery());
-                console.log(parameters);
                 if (!parameters.get('name') || !parameters.get('auth') || parameters.get('auth') != env_1.env.logger_password)
                     return res.end('Unauthorized or name / auth missing.');
                 let name = parameters.get('name');
@@ -53,6 +52,9 @@ class LoggerWebservice extends HasApp_1.default {
         }
     }
     databaseWrite(level, channel, message, server, data) {
+        if (typeof data !== 'string') {
+            JSON.stringify(data);
+        }
         this.postgresPool.query(this.writeQueryName, this.writeQueryText, [level, Date.now(), channel, message, server, data]);
     }
 }

@@ -16,6 +16,7 @@ function initializeTranslation(Alpine: any) {
             timeframe_type_since: 'Messages since',
             search_term: 'Search Term:',
             search: 'Search',
+            filter_by_channel: 'Filter by Channel:',
             filter_by_server: 'Filter by Server:',
             time: 'Time:',
             message: 'Message:',

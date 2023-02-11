@@ -52,22 +52,16 @@
                 </div>
             </div>
             <div class=" row mt-2">
+
+                <!--Search Term-->
                 <div class="col-md-3">
                     <p x-text="translate('search_term')"></p>
                     <input class="form-control" type="text" x-model="$store.controls.searchTerm">
                     <button class="btn btn-primary form-control mt-2" x-bind:disabled="!!$store.controls.autoUpdate"
                         x-text="translate('search')"></button>
                 </div>
-                <div class="col-md-3">
-                    <p x-text="translate('update_speed')"></p>
-                    <select class="form-control mt-2" x-model="$store.controls.autoUpdateSpeed">
-                        <template x-for="val in [3,5,10,15,30,60]">
-                            <option x-text="val + translate('seconds')" :value="val"></option>
-                        </template>
-                    </select>
-                    <button class="btn btn-primary form-control mt-2" x-on:click="$store.controls.autoUpdate ^= true"
-                        x-text="$store.controls.autoUpdate ? translate('auto_update_active') : translate('auto_update_deactivated')"></button>
-                </div>
+
+                <!--Timeframe-->
                 <div class="col-md-3">
                     <p x-text="translate('timeframe_type')"></p>
                     <select x-model="$store.controls.timeframeType" class="form-control mt-2">
@@ -75,14 +69,14 @@
                         <option value="timeframe" x-text="translate('timeframe_type_timeframe')"></option>
                     </select>
                     <div x-show="$store.controls.timeframeType == 'since'">
-                        <select class="form-control mt-2" x-model="$store.controls.timeSelect">
+                        <select class="form-control mt-2" id="time-select">
                             <template x-for="val in [5,10,15,30,60]">
-                                <option x-text="val + translate('minutes')" :value="val"></option>
+                                <option x-text="val + translate('minutes')" :value="val*1000"></option>
                             </template>
                             <template x-for="val in [2,4,8,24,48]">
-                                <option x-text="val + translate('hours')" :value="val*60"></option>
+                                <option x-text="val + translate('hours')" :value="val*60*60*1000"></option>
                             </template>
-                            <option x-text="translate('all_time')" value="999999"></option>
+                            <option x-text="translate('all_time')" :value="2000000000000"></option>
                         </select>
                     </div>
                     <div x-show="$store.controls.timeframeType == 'timeframe'">
@@ -90,9 +84,34 @@
                         <input class="form-control mt-1" type="datetime-local" x-model="$store.controls.datetime2">
                     </div>
                 </div>
-                <div class="col-md-3">
+
+                <!--Update speed-->
+                <div class="col-md-2">
+                    <p x-text="translate('update_speed')"></p>
+                    <select class="form-control mt-2" x-model="$store.controls.autoUpdateSpeed">
+                        <template x-for="val in [3,5,10,15,30,60]">
+                            <option x-text="val + translate('seconds')" :value="val*1000"></option>
+                        </template>
+                    </select>
+                    <button class="btn btn-primary form-control mt-2" x-on:click="$store.controls.autoUpdate ^= true"
+                        x-text="$store.controls.autoUpdate ? translate('auto_update_active') : translate('auto_update_deactivated')"></button>
+                </div>
+
+                <!--Channel filer-->
+                <div class="col-md-2">
+                    <p x-text="translate('filter_by_channel')"></p>
+                    <select class="form-control mt-2" id="channel_filter" multiple>
+                        <template x-for="channel in $store.log.channels">
+                            <option x-bind:value="channel" x-text="channel"></option>
+                        </template>
+                    </select>
+                </div>
+
+
+                <!--Server filter-->
+                <div class="col-md-2">
                     <p x-text="translate('filter_by_server')"></p>
-                    <select class="form-control mt-2" multiple>
+                    <select class="form-control mt-2" id="server_filter" multiple>
                         <template x-for="server in $store.log.servers">
                             <option x-bind:value="server" x-text="server"></option>
                         </template>

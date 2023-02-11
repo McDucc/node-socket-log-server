@@ -32,6 +32,7 @@ export default class FrontEndcontroller extends HasApp {
         this.bind('post', '/metrics', this.searchMetrics);
         this.bind('post', '/auth', this.authTest);
         this.bind('post', '/servers', this.getServers);
+        this.bind('post', '/channels', this.getChannels);
 
         ['app.html',
             'favicon.ico',
@@ -93,17 +94,11 @@ export default class FrontEndcontroller extends HasApp {
 
     async getServers(request: RequestData, response: HttpResponse) {
 
-        console.log("getting servers");
-
-        await new Promise(res => {
-            setTimeout(res, 10000);
-        });
-
         if (request.headers['auth-token'] != env.logger_password) {
             return EndReponse(response, 'Unauthenticated');
         }
 
-        let query = await this.postgresPool.query("get-servers", "SELECT DISTINCT server from logs", []);
+        let query = await this.postgresPool.query("get-servers", "SELECT DISTINCT server from logs ORDER BY server DESC", []);
         let data = query.map(entry => {
             return entry.server;
         });
@@ -111,13 +106,32 @@ export default class FrontEndcontroller extends HasApp {
         EndReponse(response, JSON.stringify(data));
     }
 
+
+    async getChannels(request: RequestData, response: HttpResponse) {
+
+        if (request.headers['auth-token'] != env.logger_password) {
+            return EndReponse(response, 'Unauthenticated');
+        }
+
+        let data = await this.getChannelArray();
+
+        EndReponse(response, JSON.stringify(data));
+    }
+
+    async getChannelArray(): Promise<string[]> {
+        let query = await this.postgresPool.query("get-channels", "SELECT DISTINCT channel from logs ORDER BY channel DESC", []);
+        let data = query.map(entry => {
+            return entry.channel;
+        });
+        return data;
+    }
+
     parametersInvalid(parameters: any) {
         return parameters.intervalStart == 0 && parameters.intervalEnd == 0 ||
-            parameters.intervalStart < parameters.intervalEnd ||
             parameters.page < 0 ||
-            parameters.pageSize < 0 ||
+            parameters.pageSize < 1 ||
             parameters.minimumLevel > parameters.maximumLevel ||
-            !Array.isArray(parameters.servers);
+            !Array.isArray(parameters.servers); //TODO
     }
 
     async searchMetrics(request: RequestData, response: HttpResponse) {
@@ -136,12 +150,12 @@ export default class FrontEndcontroller extends HasApp {
 
         try {
             this.searchLock++;
-            let parametersRaw = JSON.parse(request.data);
+            let data = JSON.parse(request.data);
 
             if (mode === 'metrics') {
-                await this.metricsSearch(parametersRaw, response);
+                await this.metricsSearch(data, response);
             } else {
-                await this.databaseSearch(parametersRaw, response);
+                await this.databaseSearch(data, response);
             }
         } catch (err: any) {
             let res = JSON.stringify({
@@ -150,7 +164,6 @@ export default class FrontEndcontroller extends HasApp {
             });
             response.writeStatus('500 Internal Server Error');
             EndReponse(response, res);
-            console.log(res);
         } finally {
             this.searchLock--;
         }
@@ -158,12 +171,13 @@ export default class FrontEndcontroller extends HasApp {
 
     async databaseSearch(parametersRaw: any, response: HttpResponse) {
         if (this.parametersInvalid(parametersRaw)) {
+            console.log(parametersRaw)
             response.writeStatus('400 Bad Request');
             EndReponse(response, 'Parameters are not within acceptable ranges');
             return;
         } else {
             let parameters: SearchParameters = parametersRaw;
-            
+
             if (typeof parameters.searchTerm !== 'string') {
                 parameters.searchTerm = JSON.stringify(parameters.searchTerm);
             }
@@ -171,7 +185,7 @@ export default class FrontEndcontroller extends HasApp {
             let data = await this.databaseLookup(
                 parameters.searchTerm,
                 parameters.servers,
-                parameters.channel,
+                parameters.channels,
                 parameters.minimumLevel,
                 parameters.maximumLevel,
                 parameters.intervalEnd,
@@ -201,7 +215,7 @@ export default class FrontEndcontroller extends HasApp {
     searchQuery1Name = 'search-query-1';
     searchQuery1 = `SELECT level,server,time,message,data FROM ${env.postgres_table} WHERE 
     search @@ plainto_tsquery($1)
-    AND channel = $2
+    AND channel IN ($2)
     AND level BETWEEN $3 AND $4
     AND server IN ($5)
     AND time BETWEEN $6 AND $7
@@ -210,7 +224,7 @@ export default class FrontEndcontroller extends HasApp {
     searchQuery2Name = 'search-query-2';
     searchQuery2 = `SELECT level,server,time,message,data FROM ${env.postgres_table} WHERE 
     search @@ plainto_tsquery($1)
-    AND channel = $2
+    AND channel IN ($2)
     AND level BETWEEN $3 AND $4
     AND time BETWEEN $5 AND $6
     OFFSET $7 LIMIT $8`;
@@ -218,7 +232,7 @@ export default class FrontEndcontroller extends HasApp {
     searchQuery1CountName = 'search-query-1-count';
     searchQuery1Count = `SELECT COUNT(*) as count FROM ${env.postgres_table} WHERE 
     search @@ plainto_tsquery($1)
-    AND channel = $2
+    AND channel IN ($2)
     AND level BETWEEN $3 AND $4
     AND server IN ($5)
     AND time BETWEEN $6 AND $7`;
@@ -226,7 +240,7 @@ export default class FrontEndcontroller extends HasApp {
     searchQuery2CountName = 'search-query-2-count';
     searchQuery2Count = `SELECT COUNT(*) as count FROM ${env.postgres_table} WHERE 
     search @@ plainto_tsquery($1)
-    AND channel = $2
+    AND channel IN $2
     AND level BETWEEN $3 AND $4
     AND time BETWEEN $5 AND $6`;
 
@@ -254,7 +268,7 @@ export default class FrontEndcontroller extends HasApp {
     async databaseLookup(
         searchTerm: string,
         servers: string[] | undefined,
-        channel: string | undefined,
+        channels: string[] | undefined,
         minimumLevel: number,
         maximumLevel: number,
         minimumTime: number,
@@ -265,18 +279,22 @@ export default class FrontEndcontroller extends HasApp {
         let data: any[];
         let entryCount: number;
 
+        if (channels === undefined) {
+            channels = await this.getChannelArray();
+        }
+
         if (servers === undefined) {
-            let parameters1 = [searchTerm, channel, minimumLevel, maximumLevel, minimumTime, maximumTime, offset, pageSize];
+            let parameters1 = [searchTerm, channels, minimumLevel, maximumLevel, minimumTime, maximumTime, offset, pageSize];
             data = await this.postgresPool.query(this.searchQuery2Name, this.searchQuery2, parameters1);
 
-            let parameters2 = [searchTerm, channel, minimumLevel, maximumLevel, minimumTime, maximumTime];
+            let parameters2 = [searchTerm, channels, minimumLevel, maximumLevel, minimumTime, maximumTime];
             entryCount = (await this.postgresPool.query(this.searchQuery2CountName, this.searchQuery2Count, parameters2))[0].count;
 
         } else {
-            let parameters1 = [searchTerm, channel, minimumLevel, maximumLevel, servers, minimumTime, maximumTime, offset, pageSize];
+            let parameters1 = [searchTerm, channels, minimumLevel, maximumLevel, servers, minimumTime, maximumTime, offset, pageSize];
             data = await this.postgresPool.query(this.searchQuery1Name, this.searchQuery1, parameters1);
 
-            let parameters2 = [searchTerm, channel, minimumLevel, maximumLevel, servers, minimumTime, maximumTime];
+            let parameters2 = [searchTerm, channels, minimumLevel, maximumLevel, servers, minimumTime, maximumTime];
             entryCount = (await this.postgresPool.query(this.searchQuery1CountName, this.searchQuery1Count, parameters2))[0].count;
         }
 
@@ -298,7 +316,7 @@ class SearchParameters {
     pageSize: number = 0;
     searchTerm: string = '';
     servers: string[] = [];
-    channel: string | undefined;
+    channels: string[] | undefined;
 }
 
 class MetricsParameters {

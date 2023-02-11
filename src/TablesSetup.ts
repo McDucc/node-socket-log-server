@@ -19,7 +19,7 @@ export default async function TableSetup(pool: Postgres): Promise<boolean> {
         try {
             await client.queryString(`
             CREATE TABLE ${env.postgres_table} (
-                id BIGINT PRIMARY KEY,
+                id BIGSERIAL PRIMARY KEY,
                 level SMALLINT,
                 time BIGINT,
                 server VARCHAR(16),

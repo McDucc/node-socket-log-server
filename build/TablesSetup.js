@@ -15,7 +15,7 @@ async function TableSetup(pool) {
         try {
             await client.queryString(`
             CREATE TABLE ${env_1.env.postgres_table} (
-                id BIGINT PRIMARY KEY,
+                id BIGSERIAL PRIMARY KEY,
                 level SMALLINT,
                 time BIGINT,
                 server VARCHAR(16),

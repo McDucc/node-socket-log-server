@@ -4,7 +4,6 @@ class RequestData {
     constructor(headers, data) {
         this.headers = headers;
         this.data = data;
-        this.data = Buffer.from(data).toString();
     }
 }
 exports.default = RequestData;
