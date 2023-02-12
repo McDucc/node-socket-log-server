@@ -28,6 +28,7 @@ const fs = __importStar(require("fs"));
 const env_1 = require("./env");
 const path_1 = __importDefault(require("path"));
 const PostgresSetup_1 = __importDefault(require("./PostgresSetup"));
+const zlib_1 = require("zlib");
 function EndReponse(response, data, closeConnection = false) {
     if (!response.ended) {
         response.end(data, closeConnection);
@@ -187,7 +188,6 @@ class FrontEndcontroller extends HasApp_1.default {
     }
     async databaseSearch(parametersRaw, response) {
         if (this.parametersInvalid(parametersRaw)) {
-            console.log(parametersRaw);
             response.writeStatus('400 Bad Request');
             EndReponse(response, 'Parameters are not within acceptable ranges');
             return;
@@ -201,14 +201,16 @@ class FrontEndcontroller extends HasApp_1.default {
             data.pageSize = parameters.pageSize;
             data.page = parameters.page;
             response.writeStatus('200 OK');
-            EndReponse(response, JSON.stringify(data));
+            response.writeHeader('Content-Encoding', 'gzip');
+            EndReponse(response, (0, zlib_1.gzipSync)(JSON.stringify(data)));
         }
     }
     async metricsSearch(parametersRaw, response) {
         let parameters = parametersRaw;
         let data = await this.metricsLookup(parameters.intervalEnd, parameters.intervalStart);
         response.writeStatus('200 OK');
-        EndReponse(response, JSON.stringify(data));
+        response.writeHeader('Content-Encoding', 'gzip');
+        EndReponse(response, (0, zlib_1.gzipSync)(JSON.stringify(data)));
     }
     async metricsLookup(minimumTime, maximumTime) {
         let data = await this.postgresPool.query(this.metricsQueryName, this.metricsQuery, [minimumTime, maximumTime]);
@@ -226,15 +228,15 @@ class FrontEndcontroller extends HasApp_1.default {
             channels = await this.getChannelArray();
         }
         if (servers === undefined) {
-            let parameters1 = [searchTerm, channels, minimumLevel, maximumLevel, minimumTime, maximumTime, offset, pageSize];
+            let parameters1 = [searchTerm, channels, minimumLevel, maximumLevel, maximumTime, minimumTime, offset, pageSize];
             data = await this.postgresPool.query(this.searchQuery2Name, this.searchQuery2, parameters1);
-            let parameters2 = [searchTerm, channels, minimumLevel, maximumLevel, minimumTime, maximumTime];
+            let parameters2 = [searchTerm, channels, minimumLevel, maximumLevel, maximumTime, minimumTime];
             entryCount = (await this.postgresPool.query(this.searchQuery2CountName, this.searchQuery2Count, parameters2))[0].count;
         }
         else {
-            let parameters1 = [searchTerm, channels, minimumLevel, maximumLevel, servers, minimumTime, maximumTime, offset, pageSize];
+            let parameters1 = [searchTerm, channels, minimumLevel, maximumLevel, servers, maximumTime, minimumTime, offset, pageSize];
             data = await this.postgresPool.query(this.searchQuery1Name, this.searchQuery1, parameters1);
-            let parameters2 = [searchTerm, channels, minimumLevel, maximumLevel, servers, minimumTime, maximumTime];
+            let parameters2 = [searchTerm, channels, minimumLevel, maximumLevel, servers, maximumTime, minimumTime];
             entryCount = (await this.postgresPool.query(this.searchQuery1CountName, this.searchQuery1Count, parameters2))[0].count;
         }
         return {

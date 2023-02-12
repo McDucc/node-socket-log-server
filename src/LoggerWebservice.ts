@@ -70,7 +70,7 @@ export default class LoggerWebservice extends HasApp {
     }
 
     databaseWrite(level: number, channel: string, message: string, server: string, data: string) {
-        if (typeof data !== 'string') { JSON.stringify(data); }
+        if (typeof data !== 'string') { data = JSON.stringify(data); }
         this.postgresPool.query(this.writeQueryName, this.writeQueryText, [level, Date.now(), channel, message, server, data])
     }
 }

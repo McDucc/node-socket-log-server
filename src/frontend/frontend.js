@@ -37,14 +37,14 @@ const metrics = [cpu_load, ram_used, disk_read, disk_write, disk_used, traffic_i
 
 function getTimestamps(fieldIndex) {
 
+    let timeframe = Alpine.store('controls').timeframeType == 'since';
+
     if (fieldIndex == 0) {
-        if (Alpine.store('controls').timeframeType == 'since') {
-            //Return relative time
-            return Date.now() - parseInt(document.getElementById('time-select').value);
-        }
-        field = Alpine.store('controls').datetime1;
+        if (timeframe) return Date.now() - document.getElementById('time-select').value;
+        field = document.getElementById('datetime1').value;
     } else {
-        field = Alpine.store('controls').datetime2;
+        if (timeframe) return Date.now();
+        field = document.getElementById('datetime2').value;
     }
 
     return new Date(field).getTime();
@@ -105,8 +105,8 @@ setInterval(async () => {
 
     let now = Date.now();
 
-    if (Alpine.store('controls').autoUpdate && ((now - Alpine.store('controls').autoUpdateSpeed) > lastAutoUpdate)) {
-        search(Alpine.store('controls').searchTerm, 0, 10, Alpine.store('controls').page, 100);
+    if (Alpine.store('controls').autoUpdate && ((now - document.getElementById('auto-update-speed').value) > lastAutoUpdate)) {
+        search(Alpine.store('controls').searchTerm, 0, 10, Alpine.store('controls').page, Alpine.store('controls').pageSize);
         lastAutoUpdate = now;
     }
 }, 333)
@@ -127,7 +127,6 @@ document.addEventListener('alpine:init', () => {
         showModal: true,
         showServerMetrics: false,
         autoUpdate: false,
-        autoUpdateSpeed: 3,
         metrics,
         timeframeType: 'since',
         page: 0,
@@ -175,7 +174,6 @@ async function search(searchTerm, minimumLevel, maximumLevel, page, pageSize) {
         console.log(json);
 
         Alpine.store('log').messages = json.data;
-        Alpine.store('controls').page = json.page;
         Alpine.store('controls').pageSize = json.pageSize;
         Alpine.store('controls').lastPage = Math.ceil(json.entryCount / json.pageSize);
     } catch (err) {
@@ -260,4 +258,20 @@ function getMultiSelectValues(id) {
     });
 
     return selected;
+}
+
+function prettifyJson(json) {
+    //Remove critical characters
+    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+        let type = 'alx-number';
+        if (/^"/.test(match)) {
+            type = /:$/.test(match) ? 'alx-key' : 'alx-string';
+        } else if (/true|false/.test(match)) {
+            type = 'alx-boolean';
+        } else if (/null/.test(match)) {
+            type = 'alx-null';
+        }
+        return '<span class="' + type + '">' + match + '</span>';
+    });
 }

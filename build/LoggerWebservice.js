@@ -53,7 +53,7 @@ class LoggerWebservice extends HasApp_1.default {
     }
     databaseWrite(level, channel, message, server, data) {
         if (typeof data !== 'string') {
-            JSON.stringify(data);
+            data = JSON.stringify(data);
         }
         this.postgresPool.query(this.writeQueryName, this.writeQueryText, [level, Date.now(), channel, message, server, data]);
     }

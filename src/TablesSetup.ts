@@ -16,6 +16,7 @@ export default async function TableSetup(pool: Postgres): Promise<boolean> {
 
     if (table_columns.length === 0) {
         let client = await pool.connect();
+        console.log("Running Table Setup");
         try {
             await client.queryString(`
             CREATE TABLE ${env.postgres_table} (
@@ -29,14 +30,14 @@ export default async function TableSetup(pool: Postgres): Promise<boolean> {
                 search TSVECTOR);`);
 
             await client.queryString(`
-            CREATE FUNCTION search_tsvector_update AS $$
+            CREATE FUNCTION search_tsvector_update() RETURNS trigger AS $$
             BEGIN
                 new.search := 
                     setweight(to_tsvector('${env.postgres_language}', new.data), 'A')
                     ||setweight(to_tsvector('${env.postgres_language}', new.message), 'B');
                 return new;
             END
-            $$ LANGUAGE plpgsql;`);
+            $$ LANGUAGE plpgsql`);
 
             await client.queryString(`
             CREATE TRIGGER search_tsvector_trigger
@@ -59,9 +60,12 @@ export default async function TableSetup(pool: Postgres): Promise<boolean> {
             await client.queryString(`
             CREATE INDEX search_index ON ${env.postgres_table} USING GIN (search);`);
 
-        } catch {
+        } catch (err) {
             client.release();
+            console.log("Table Setup failed", err);
+            return false;
         }
+        console.log("Table Setup successful");
         return true;
     }
 
@@ -70,6 +74,9 @@ export default async function TableSetup(pool: Postgres): Promise<boolean> {
     for (let column of table_columns) {
         if (required_columns.indexOf(column.column_name) === -1) return false;
     }
+
+
+    console.log("Table Setup skipped");
 
     return true;
 }

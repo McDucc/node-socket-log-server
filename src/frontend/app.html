@@ -80,15 +80,15 @@
                         </select>
                     </div>
                     <div x-show="$store.controls.timeframeType == 'timeframe'">
-                        <input class="form-control mt-1" type="datetime-local" x-model="$store.controls.datetime1">
-                        <input class="form-control mt-1" type="datetime-local" x-model="$store.controls.datetime2">
+                        <input class="form-control mt-1" type="datetime-local" id="datetime1">
+                        <input class="form-control mt-1" type="datetime-local" id="datetime2">
                     </div>
                 </div>
 
                 <!--Update speed-->
                 <div class="col-md-2">
                     <p x-text="translate('update_speed')"></p>
-                    <select class="form-control mt-2" x-model="$store.controls.autoUpdateSpeed">
+                    <select class="form-control mt-2" id="auto-update-speed">
                         <template x-for="val in [3,5,10,15,30,60]">
                             <option x-text="val + translate('seconds')" :value="val*1000"></option>
                         </template>
@@ -136,17 +136,19 @@
 
         <!-- Logs Page -->
         <div class="bd-example row col-md-12 mt-4 alx-messages" x-show="!$store.controls.showServerMetrics">
-            <template x-for="i in $store.log.lastPage">
-                <div :class="i == $store.log.page ? 'btn btn-primary alm' : 'btn btn-primary alx'" x-text="i">
+            <template x-for="i in $store.controls.lastPage">
+                <div :class="i-1 == $store.controls.page ? 'btn btn-primary alx-selected' : 'btn btn-primary alx'"
+                    x-text="i" @click="$store.controls.page = i-1">
                 </div>
             </template>
             <template x-for="message in $store.log.messages">
                 <div class="alert alert-dark alm">
-                    <b x-text="translate('time')"></b> <span x-text="message.time"></span><br>
+                    <b x-text="translate('time')"></b> <span
+                        x-text="new Date(parseInt(message.time)).toISOString().replaceAll('T',' ').replaceAll('Z',' ')"></span><br>
                     <b x-text="translate('message')"></b> <span x-text="message.message"></span><br>
                     <b x-text="translate('level')"></b> <span x-text="message.level"></span><br>
                     <b x-text="translate('server')"></b> <span x-text="message.server"></span><br>
-                    <b x-text="translate('data')"></b> <span x-text="message.data"></span><br>
+                    <b x-text="translate('data')"></b> <span x-html="prettifyJson(message.data)"></span><br>
                 </div>
             </template>
         </div>

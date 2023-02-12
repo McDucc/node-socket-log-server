@@ -12,6 +12,7 @@ async function TableSetup(pool) {
         AND table_name = $2;`, [env_1.env.postgres_schema, env_1.env.postgres_table]);
     if (table_columns.length === 0) {
         let client = await pool.connect();
+        console.log("Running Table Setup");
         try {
             await client.queryString(`
             CREATE TABLE ${env_1.env.postgres_table} (
@@ -24,14 +25,14 @@ async function TableSetup(pool) {
                 data VARCHAR(4096),
                 search TSVECTOR);`);
             await client.queryString(`
-            CREATE FUNCTION search_tsvector_update AS $$
+            CREATE FUNCTION search_tsvector_update() RETURNS trigger AS $$
             BEGIN
                 new.search := 
                     setweight(to_tsvector('${env_1.env.postgres_language}', new.data), 'A')
                     ||setweight(to_tsvector('${env_1.env.postgres_language}', new.message), 'B');
                 return new;
             END
-            $$ LANGUAGE plpgsql;`);
+            $$ LANGUAGE plpgsql`);
             await client.queryString(`
             CREATE TRIGGER search_tsvector_trigger
             BEFORE INSERT OR UPDATE
@@ -48,9 +49,12 @@ async function TableSetup(pool) {
             await client.queryString(`
             CREATE INDEX search_index ON ${env_1.env.postgres_table} USING GIN (search);`);
         }
-        catch (_a) {
+        catch (err) {
             client.release();
+            console.log("Table Setup failed", err);
+            return false;
         }
+        console.log("Table Setup successful");
         return true;
     }
     let required_columns = ["id", "level", "time", "channel", "message", "data"];
@@ -58,6 +62,7 @@ async function TableSetup(pool) {
         if (required_columns.indexOf(column.column_name) === -1)
             return false;
     }
+    console.log("Table Setup skipped");
     return true;
 }
 exports.default = TableSetup;

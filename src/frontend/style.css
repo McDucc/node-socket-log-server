@@ -17,8 +17,36 @@
     color: #dee2e6;
 }
 
+.alx-key {
+    color: white;
+}
+
+.alx-number {
+    color: orange;
+}
+
+.alx-string {
+    color: greenyellow;
+}
+
+.alx-boolean {
+    color: red;
+}
+
+.alx-null {
+    color: aqua;
+}
+
 .alx {
     background-color: #07429b;
+    color: #dee2e6;
+    width: auto !important;
+    margin-bottom: 2em !important;
+    margin-right: 0.25em !important;
+}
+
+.alx-selected {
+    background-color: #414549;
     color: #dee2e6;
     width: auto !important;
     margin-bottom: 2em !important;
