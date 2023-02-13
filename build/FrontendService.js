@@ -45,7 +45,7 @@ class FrontEndcontroller extends HasApp_1.default {
     search @@ plainto_tsquery($1)
     AND channel IN ($2)
     AND level BETWEEN $3 AND $4
-    AND server IN ($5)
+    AND server = ANY($5)
     AND time BETWEEN $6 AND $7
     OFFSET $8 LIMIT $9`;
         this.searchQuery2Name = 'search-query-2';
@@ -60,7 +60,7 @@ class FrontEndcontroller extends HasApp_1.default {
     search @@ plainto_tsquery($1)
     AND channel IN ($2)
     AND level BETWEEN $3 AND $4
-    AND server IN ($5)
+    AND server = ANY($5)
     AND time BETWEEN $6 AND $7`;
         this.searchQuery2CountName = 'search-query-2-count';
         this.searchQuery2Count = `SELECT COUNT(*) as count FROM ${env_1.env.postgres_table} WHERE 
@@ -141,7 +141,7 @@ class FrontEndcontroller extends HasApp_1.default {
         EndReponse(response, JSON.stringify(data));
     }
     async getChannelArray() {
-        let query = await this.postgresPool.query("get-channels", "SELECT DISTINCT channel from logs ORDER BY channel DESC", []);
+        let query = await this.postgresPool.query("get-channels", "SELECT DISTINCT channel from logs WHERE channel != 'metrics' ORDER BY channel DESC", []);
         let data = query.map(entry => {
             return entry.channel;
         });
@@ -175,12 +175,11 @@ class FrontEndcontroller extends HasApp_1.default {
             }
         }
         catch (err) {
-            let res = JSON.stringify({
+            response.writeStatus('500 Internal Server Error');
+            EndReponse(response, JSON.stringify({
                 message: err.message,
                 stack: err.stack,
-            });
-            response.writeStatus('500 Internal Server Error');
-            EndReponse(response, res);
+            }));
         }
         finally {
             this.searchLock--;
@@ -202,7 +201,7 @@ class FrontEndcontroller extends HasApp_1.default {
             data.page = parameters.page;
             response.writeStatus('200 OK');
             response.writeHeader('Content-Encoding', 'gzip');
-            EndReponse(response, (0, zlib_1.gzipSync)(JSON.stringify(data)));
+            EndReponse(response, (0, zlib_1.gzipSync)(JSON.stringify(data), { level: 9, memLevel: 9 }));
         }
     }
     async metricsSearch(parametersRaw, response) {
@@ -210,7 +209,7 @@ class FrontEndcontroller extends HasApp_1.default {
         let data = await this.metricsLookup(parameters.intervalEnd, parameters.intervalStart);
         response.writeStatus('200 OK');
         response.writeHeader('Content-Encoding', 'gzip');
-        EndReponse(response, (0, zlib_1.gzipSync)(JSON.stringify(data)));
+        EndReponse(response, (0, zlib_1.gzipSync)(JSON.stringify(data), { level: 9, memLevel: 9 }));
     }
     async metricsLookup(minimumTime, maximumTime) {
         let data = await this.postgresPool.query(this.metricsQueryName, this.metricsQuery, [minimumTime, maximumTime]);
@@ -234,9 +233,11 @@ class FrontEndcontroller extends HasApp_1.default {
             entryCount = (await this.postgresPool.query(this.searchQuery2CountName, this.searchQuery2Count, parameters2))[0].count;
         }
         else {
-            let parameters1 = [searchTerm, channels, minimumLevel, maximumLevel, servers, maximumTime, minimumTime, offset, pageSize];
+            let serverCasted = '{' + servers.join(',') + '}';
+            let parameters1 = [searchTerm, channels, minimumLevel, maximumLevel, serverCasted, maximumTime, minimumTime, offset, pageSize];
+            console.log(parameters1);
             data = await this.postgresPool.query(this.searchQuery1Name, this.searchQuery1, parameters1);
-            let parameters2 = [searchTerm, channels, minimumLevel, maximumLevel, servers, maximumTime, minimumTime];
+            let parameters2 = [searchTerm, channels, minimumLevel, maximumLevel, serverCasted, maximumTime, minimumTime];
             entryCount = (await this.postgresPool.query(this.searchQuery1CountName, this.searchQuery1Count, parameters2))[0].count;
         }
         return {

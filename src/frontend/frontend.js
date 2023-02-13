@@ -40,17 +40,18 @@ function getTimestamps(fieldIndex) {
     let timeframe = Alpine.store('controls').timeframeType == 'since';
 
     if (fieldIndex == 0) {
-        if (timeframe) return Date.now() - document.getElementById('time-select').value;
-        field = document.getElementById('datetime1').value;
+        if (timeframe) return Date.now() - Alpine.store('controls').timeSelect;
+        field = Alpine.store('controls').datetime1;
     } else {
         if (timeframe) return Date.now();
-        field = document.getElementById('datetime2').value;
+        field = Alpine.store('controls').datetime2;
     }
 
     return new Date(field).getTime();
 }
 
 let updatingMetrics = false;
+let metricsCompiled = {};
 async function updateMetrics() {
     if (updatingMetrics) return;
     updatingMetrics = true;
@@ -81,8 +82,11 @@ async function updateMetrics() {
                 index++;
             });
         }
-    } catch { }
-    updatingMetrics = false;
+    } catch (err) {
+        console.log(err);
+    } finally {
+        updatingMetrics = false;
+    }
 }
 
 setInterval(async () => {
@@ -105,7 +109,7 @@ setInterval(async () => {
 
     let now = Date.now();
 
-    if (Alpine.store('controls').autoUpdate && ((now - document.getElementById('auto-update-speed').value) > lastAutoUpdate)) {
+    if (Alpine.store('controls').autoUpdate && ((now - parseInt(Alpine.store('controls').autoUpdateSpeed)) > lastAutoUpdate)) {
         search(Alpine.store('controls').searchTerm, 0, 10, Alpine.store('controls').page, Alpine.store('controls').pageSize);
         lastAutoUpdate = now;
     }
@@ -116,8 +120,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.store('log', {
         servers: [],
         channels: [],
-        messages: [],
-        metricsCompiled: {}
+        messages: []
     })
 
     //Need to refactor into class document id value calls
@@ -127,8 +130,13 @@ document.addEventListener('alpine:init', () => {
         showModal: true,
         showServerMetrics: false,
         autoUpdate: false,
-        metrics,
+        autoUpdateSpeed: 3000,
+        datetime1: new Date().toISOString().substring(0, 10),
+        datetime2: new Date().toISOString().substring(0, 10),
+        serverFilter: [],
+        channelFilter: [],
         timeframeType: 'since',
+        timeSelect: 60000,
         page: 0,
         pageSize: 50,
         lastPage: 0,
@@ -148,7 +156,8 @@ document.addEventListener('alpine:init', () => {
 
 let searchActive = false;
 async function search(searchTerm, minimumLevel, maximumLevel, page, pageSize) {
-    if (searchActive) return;
+    searchTerm = searchTerm.trim();
+    if (searchActive || !searchTerm) return;
 
     try {
         searchActive = true;
@@ -162,8 +171,8 @@ async function search(searchTerm, minimumLevel, maximumLevel, page, pageSize) {
             page,
             minimumLevel,
             maximumLevel,
-            servers: getMultiSelectValues('server_filter'),
-            channels: getMultiSelectValues('channel_filter')
+            servers: Object.values(Alpine.store('controls').serverFilter),
+            channels: Object.values(Alpine.store('controls').channelFilter)
         });
 
         console.log(data.body);
@@ -183,10 +192,8 @@ async function search(searchTerm, minimumLevel, maximumLevel, page, pageSize) {
     }
 }
 
-var charts = {};
+let charts = {};
 async function syncCharts() {
-    if (typeof metricsCompiled === 'undefined') return;
-
     try {
         let charts = document.getElementsByClassName('metric-canvas');
         for (let element of charts) {
@@ -245,19 +252,6 @@ function makeOrUpdateChart(chartData, chartName, chartLabels, element) {
         charts[chartName].data.labels = chartLabels;
         charts[chartName].update();
     }
-}
-
-function getMultiSelectValues(id) {
-    let element = document.getElementById(id);
-    let options = element.querySelectorAll('option');
-
-    let selected = [];
-
-    options.forEach((option) => {
-        if (option.selected) selected.push(option.value);
-    });
-
-    return selected;
 }
 
 function prettifyJson(json) {

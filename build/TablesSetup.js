@@ -27,6 +27,7 @@ async function TableSetup(pool) {
             await client.queryString(`
             CREATE FUNCTION search_tsvector_update() RETURNS trigger AS $$
             BEGIN
+                IF new.channel = 'metrics' THEN return new; END IF;
                 new.search := 
                     setweight(to_tsvector('${env_1.env.postgres_language}', new.data), 'A')
                     ||setweight(to_tsvector('${env_1.env.postgres_language}', new.message), 'B');

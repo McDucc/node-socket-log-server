@@ -26,8 +26,8 @@ class LoggerWebservice extends HasApp_1.default {
                 if (!parameters.get('name') || !parameters.get('auth') || parameters.get('auth') != env_1.env.logger_password)
                     return res.end('Unauthorized or name / auth missing.');
                 let name = parameters.get('name');
-                let address = Buffer.from(res.getProxiedRemoteAddressAsText()).toString();
-                console.log(`[${new Date().toISOString()}] Accepted connection with ${name}: ${address}`);
+                let address = Buffer.from(res.getRemoteAddressAsText()).toString();
+                console.log(`[${new Date().toISOString()}] Accepted connection with ${name} - Address: ${address}`);
                 res.upgrade({ name, address }, req.getHeader('sec-websocket-key'), req.getHeader('sec-websocket-protocol'), req.getHeader('sec-websocket-extensions'), context);
             },
             message: (ws, message) => {
@@ -44,7 +44,7 @@ class LoggerWebservice extends HasApp_1.default {
         this.startListening();
     }
     log(message, server) {
-        if (message.level === undefined && message.channel === undefined && message.message === undefined) {
+        if (!message.level && !message.channel && !message.message) {
             this.databaseWrite(0, 'metrics', '', server, message.data);
         }
         else {
