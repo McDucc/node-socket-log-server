@@ -50,11 +50,8 @@ function getTimestamps(fieldIndex) {
     return new Date(field).getTime();
 }
 
-let updatingMetrics = false;
 let metricsCompiled = {};
 async function updateMetrics() {
-    if (updatingMetrics) return;
-    updatingMetrics = true;
     try {
         let data = basicPost();
         data.body = JSON.stringify({
@@ -62,9 +59,13 @@ async function updateMetrics() {
             intervalEnd: getTimestamps(1),
         });
 
+        console.log('Metrics request:', data.body);
+
         let response = await fetch('/metrics', data);
         let json = await response.json();
         let resolution = 20;
+
+        console.log('Metrics result:', json);
 
         if (Array.isArray(response.data)) {
             metricsCompiled = {};
@@ -84,24 +85,43 @@ async function updateMetrics() {
         }
     } catch (err) {
         console.log(err);
-    } finally {
-        updatingMetrics = false;
     }
 }
 
+let updatingMetadata = false;
 setInterval(async () => {
-    if (typeof Alpine === 'undefined') return;
+    if (typeof Alpine === 'undefined' || updatingMetadata) return;
 
-    if (Alpine.store('credentials').authenticated === 2)
+    if (Alpine.store('credentials').authenticated === 2) {
         try {
+            updatingMetadata = true;
             await updateServerList();
             await updateChannelList();
+        } catch (err) {
+            console.log(err);
+        } finally {
+            updatingMetadata = false;
+        }
+    }
+}, 2000);
+
+
+let updatingMetrics = false;
+setInterval(async () => {
+    if (typeof Alpine === 'undefined' || updatingMetrics) return;
+
+    if (Alpine.store('credentials').authenticated === 2) {
+        try {
+            updatingMetrics = true;
             await updateMetrics();
             await syncCharts();
         } catch (err) {
             console.log(err);
+        } finally {
+            updatingMetrics = false;
         }
-}, 5000);
+    }
+}, 10000);
 
 let lastAutoUpdate = 0;
 setInterval(async () => {
@@ -131,12 +151,10 @@ document.addEventListener('alpine:init', () => {
         showServerMetrics: false,
         autoUpdate: false,
         autoUpdateSpeed: 3000,
-        datetime1: new Date().toISOString().substring(0, 10),
-        datetime2: new Date().toISOString().substring(0, 10),
         serverFilter: [],
         channelFilter: [],
         timeframeType: 'since',
-        timeSelect: 60000,
+        timeSelect: 2000000000000,
         page: 0,
         pageSize: 50,
         lastPage: 0,
@@ -165,8 +183,8 @@ async function search(searchTerm, minimumLevel, maximumLevel, page, pageSize) {
 
         data.body = JSON.stringify({
             searchTerm,
-            intervalStart: getTimestamps(0),
-            intervalEnd: getTimestamps(1),
+            intervalStart: Math.min(getTimestamps(0), getTimestamps(1)),
+            intervalEnd: Math.max(getTimestamps(0), getTimestamps(1)),
             pageSize,
             page,
             minimumLevel,
@@ -175,12 +193,12 @@ async function search(searchTerm, minimumLevel, maximumLevel, page, pageSize) {
             channels: Object.values(Alpine.store('controls').channelFilter)
         });
 
-        console.log(data.body);
+        console.log('Search request:', data.body);
 
         let response = await fetch('/search', data);
         let json = await response.json();
 
-        console.log(json);
+        console.log('Search result:', json);
 
         Alpine.store('log').messages = json.data;
         Alpine.store('controls').pageSize = json.pageSize;
@@ -199,7 +217,7 @@ async function syncCharts() {
         for (let element of charts) {
             let chartName = element.id;
             makeOrUpdateChart(metricsCompiled[chartName], chartName, metricsCompiledLabels[chartName], element);
-            await new Promise(resolve => setTimeout(resolve, 5));
+            await new Promise(resolve => setTimeout(resolve, 10));
         };
     } catch (err) {
         console.log(err);

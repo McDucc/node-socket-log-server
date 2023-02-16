@@ -43,7 +43,7 @@ class FrontEndcontroller extends HasApp_1.default {
         this.searchQuery1Name = 'search-query-1';
         this.searchQuery1 = `SELECT level,server,time,message,data FROM ${env_1.env.postgres_table} WHERE 
     search @@ plainto_tsquery($1)
-    AND channel IN ($2)
+    AND channel = ANY($2)
     AND level BETWEEN $3 AND $4
     AND server = ANY($5)
     AND time BETWEEN $6 AND $7
@@ -51,21 +51,21 @@ class FrontEndcontroller extends HasApp_1.default {
         this.searchQuery2Name = 'search-query-2';
         this.searchQuery2 = `SELECT level,server,time,message,data FROM ${env_1.env.postgres_table} WHERE 
     search @@ plainto_tsquery($1)
-    AND channel IN ($2)
+    AND channel = ANY($2)
     AND level BETWEEN $3 AND $4
     AND time BETWEEN $5 AND $6
     OFFSET $7 LIMIT $8`;
         this.searchQuery1CountName = 'search-query-1-count';
         this.searchQuery1Count = `SELECT COUNT(*) as count FROM ${env_1.env.postgres_table} WHERE 
     search @@ plainto_tsquery($1)
-    AND channel IN ($2)
+    AND channel = ANY($2)
     AND level BETWEEN $3 AND $4
     AND server = ANY($5)
     AND time BETWEEN $6 AND $7`;
         this.searchQuery2CountName = 'search-query-2-count';
         this.searchQuery2Count = `SELECT COUNT(*) as count FROM ${env_1.env.postgres_table} WHERE 
     search @@ plainto_tsquery($1)
-    AND channel IN $2
+    AND channel = ANY($2)
     AND level BETWEEN $3 AND $4
     AND time BETWEEN $5 AND $6`;
         this.metricsQueryName = 'search-query-2-count';
@@ -226,18 +226,18 @@ class FrontEndcontroller extends HasApp_1.default {
         if (channels === undefined) {
             channels = await this.getChannelArray();
         }
+        let channelsCasted = '{' + channels.join(',') + '}';
         if (servers === undefined) {
-            let parameters1 = [searchTerm, channels, minimumLevel, maximumLevel, maximumTime, minimumTime, offset, pageSize];
+            let parameters1 = [searchTerm, channelsCasted, minimumLevel, maximumLevel, maximumTime, minimumTime, offset, pageSize];
             data = await this.postgresPool.query(this.searchQuery2Name, this.searchQuery2, parameters1);
-            let parameters2 = [searchTerm, channels, minimumLevel, maximumLevel, maximumTime, minimumTime];
+            let parameters2 = [searchTerm, channelsCasted, minimumLevel, maximumLevel, maximumTime, minimumTime];
             entryCount = (await this.postgresPool.query(this.searchQuery2CountName, this.searchQuery2Count, parameters2))[0].count;
         }
         else {
             let serverCasted = '{' + servers.join(',') + '}';
-            let parameters1 = [searchTerm, channels, minimumLevel, maximumLevel, serverCasted, maximumTime, minimumTime, offset, pageSize];
-            console.log(parameters1);
+            let parameters1 = [searchTerm, channelsCasted, minimumLevel, maximumLevel, serverCasted, maximumTime, minimumTime, offset, pageSize];
             data = await this.postgresPool.query(this.searchQuery1Name, this.searchQuery1, parameters1);
-            let parameters2 = [searchTerm, channels, minimumLevel, maximumLevel, serverCasted, maximumTime, minimumTime];
+            let parameters2 = [searchTerm, channelsCasted, minimumLevel, maximumLevel, serverCasted, maximumTime, minimumTime];
             entryCount = (await this.postgresPool.query(this.searchQuery1CountName, this.searchQuery1Count, parameters2))[0].count;
         }
         return {

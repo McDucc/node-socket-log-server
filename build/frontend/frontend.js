@@ -89,19 +89,24 @@ async function updateMetrics() {
     }
 }
 
+let updatingMetadata = false;
 setInterval(async () => {
-    if (typeof Alpine === 'undefined') return;
+    if (typeof Alpine === 'undefined' || updatingMetadata) return;
 
-    if (Alpine.store('credentials').authenticated === 2)
+    if (Alpine.store('credentials').authenticated === 2) {
         try {
+            updatingMetadata = true;
             await updateServerList();
             await updateChannelList();
             await updateMetrics();
             await syncCharts();
         } catch (err) {
             console.log(err);
+        } finally {
+            updatingMetadata = false;
         }
-}, 5000);
+    }
+}, 2000);
 
 let lastAutoUpdate = 0;
 setInterval(async () => {
@@ -131,12 +136,10 @@ document.addEventListener('alpine:init', () => {
         showServerMetrics: false,
         autoUpdate: false,
         autoUpdateSpeed: 3000,
-        datetime1: new Date().toISOString().substring(0, 10),
-        datetime2: new Date().toISOString().substring(0, 10),
         serverFilter: [],
         channelFilter: [],
         timeframeType: 'since',
-        timeSelect: 60000,
+        timeSelect: 2000000000000,
         page: 0,
         pageSize: 50,
         lastPage: 0,
@@ -165,8 +168,8 @@ async function search(searchTerm, minimumLevel, maximumLevel, page, pageSize) {
 
         data.body = JSON.stringify({
             searchTerm,
-            intervalStart: getTimestamps(0),
-            intervalEnd: getTimestamps(1),
+            intervalStart: Math.min(getTimestamps(0), getTimestamps(1)),
+            intervalEnd: Math.max(getTimestamps(0), getTimestamps(1)),
             pageSize,
             page,
             minimumLevel,
