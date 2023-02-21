@@ -46,7 +46,7 @@ export default class FrontEndcontroller extends HasApp {
         this.startListening();
     }
 
-    bind(method: 'post' | 'get', routePattern: string, handler: (request: RequestData, response: HttpResponse) => void) {
+    bind(method: 'post' | 'get', routePattern: string, handler: (request: RequestData, response: HttpResponse) => void, auth: boolean = true) {
 
         //this keyword is lost / becomes undefined because the function is passed as an argument
         //https://stackoverflow.com/questions/4011793/this-is-undefined-in-javascript-class-methods
@@ -60,6 +60,10 @@ export default class FrontEndcontroller extends HasApp {
             request.forEach((headerKey, headerValue) => {
                 headers[headerKey] = headerValue;
             });
+
+            if (auth && headers['auth-token'] !== env.logger_password) {
+                return EndReponse(response, 'Unauthenticated');
+            }
 
             let body = Buffer.from('');
             response.onData(async (data: ArrayBuffer, isLast: boolean) => {
@@ -77,28 +81,19 @@ export default class FrontEndcontroller extends HasApp {
         if (!fs.existsSync(filePath))
             console.log(new Error(filePath + ' does not exist and can not be bound to router!'));
 
-        this.bind('get', '/' + file, (request: RequestData, response: HttpResponse) => {
+        this.bind('get', '/' + file, (_request: RequestData, response: HttpResponse) => {
             fs.readFile(filePath, (err, data) => {
                 if (err) console.log(err);
                 EndReponse(response, data);
             });
-        });
+        }, false);
     }
 
-    authTest(request: RequestData, response: HttpResponse) {
-        if (request.headers['auth-token'] != env.logger_password) {
-            return EndReponse(response, 'Unauthenticated');
-        }
-
+    authTest(_request: RequestData, response: HttpResponse) {
         return EndReponse(response, 'Authenticated');
     }
 
     async getServers(request: RequestData, response: HttpResponse) {
-
-        if (request.headers['auth-token'] != env.logger_password) {
-            return EndReponse(response, 'Unauthenticated');
-        }
-
         let query = await this.postgresPool.query("get-servers", "SELECT DISTINCT server from logs ORDER BY server DESC", []);
         let data = query.map(entry => {
             return entry.server;
@@ -118,11 +113,6 @@ export default class FrontEndcontroller extends HasApp {
 
 
     async getChannels(request: RequestData, response: HttpResponse) {
-
-        if (request.headers['auth-token'] != env.logger_password) {
-            return EndReponse(response, 'Unauthenticated');
-        }
-
         EndReponse(response, JSON.stringify(await this.getChannelArray()));
     }
 
@@ -146,9 +136,6 @@ export default class FrontEndcontroller extends HasApp {
     }
 
     async search(request: RequestData, response: HttpResponse, mode: 'metrics' | 'database' = 'database') {
-        if (request.headers['auth-token'] != env.logger_password) {
-            return EndReponse(response, 'Unauthenticated');
-        }
 
         if (this.searchLock >= this.searchLockLimit) {
             return EndReponse(response, 'Locked');
