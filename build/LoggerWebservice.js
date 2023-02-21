@@ -8,14 +8,18 @@ const env_1 = require("./env");
 const uWebSockets_js_1 = require("uWebSockets.js");
 const url_1 = require("url");
 const PostgresSetup_1 = __importDefault(require("./PostgresSetup"));
-const TablesSetup_1 = __importDefault(require("./TablesSetup"));
+const TableSetup_1 = __importDefault(require("./TableSetup"));
 class LoggerWebservice extends HasApp_1.default {
     constructor() {
         super(env_1.env.logger_port);
-        this.writeQueryName = 'write-log';
-        this.writeQueryText = 'INSERT INTO logs (level,time,channel,message,server,data) VALUES ($1,$2,$3,$4,$5,$6)';
+        this.writeLogQueryName = 'write-log';
+        this.writeLogQueryText = `INSERT INTO ${env_1.env.postgres.logs_table} (level,time,channel,message,server,data) VALUES ($1,$2,$3,$4,$5,$6)`;
+        this.writeMetricsQueryName = 'write-metric';
+        this.writeMetricsQueryText = `INSERT INTO ${env_1.env.postgres.metrics_table} 
+           (time,server,cpu,mem_used,io_read,io_write,disk_used,net_in,net_out)
+    VALUES ($1  ,$2    ,$3 ,$4      ,$5     ,$6      ,$7       ,$8    ,$9)`;
         this.postgresPool = (0, PostgresSetup_1.default)();
-        (0, TablesSetup_1.default)(this.postgresPool);
+        (0, TableSetup_1.default)(this.postgresPool);
         this.app.ws('/log', {
             idleTimeout: 32,
             maxBackpressure: 2 * 1024,
@@ -44,18 +48,22 @@ class LoggerWebservice extends HasApp_1.default {
         this.startListening();
     }
     log(message, server) {
-        if (!message.level && !message.channel && !message.message) {
-            this.databaseWrite(0, 'metrics', '', server, message.data);
+        if (!message.channel) {
+            this.writeMetrics(server, message.cpu, message.mem_used, message.io_read, message.io_write, message.disk_used, message.net_in, message.net_out);
         }
         else {
-            this.databaseWrite(message.level, message.channel, message.message, server, message.data);
+            this.writeLog(message.level, message.channel, message.message, server, message.data);
         }
     }
-    databaseWrite(level, channel, message, server, data) {
+    writeLog(level, channel, message, server, data) {
         if (typeof data !== 'string') {
             data = JSON.stringify(data);
         }
-        this.postgresPool.query(this.writeQueryName, this.writeQueryText, [level, Date.now(), channel, message, server, data]);
+        this.postgresPool.query(this.writeLogQueryName, this.writeLogQueryText, [level, Date.now(), channel, message, server, data]);
+    }
+    writeMetrics(server, cpu, mem_used, io_read, io_write, disk_used, net_in, net_out) {
+        let array = [Date.now(), server, cpu, mem_used, io_read, io_write, disk_used, net_in, net_out];
+        this.postgresPool.query(this.writeMetricsQueryName, this.writeMetricsQueryText, array);
     }
 }
 exports.default = LoggerWebservice;
@@ -65,5 +73,12 @@ class IncomingData {
         this.channel = '';
         this.message = '';
         this.data = '';
+        this.cpu = 0;
+        this.mem_used = 0;
+        this.io_read = 0;
+        this.io_write = 0;
+        this.disk_used = 0;
+        this.net_in = 0;
+        this.net_out = 0;
     }
 }

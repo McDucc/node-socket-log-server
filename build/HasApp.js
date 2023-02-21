@@ -9,7 +9,15 @@ class HasApp {
             console.log(err);
             process.exit(1);
         });
-        this.app = (0, uWebSockets_js_1.App)({});
+        if (env_1.env.ssl) {
+            this.app = (0, uWebSockets_js_1.SSLApp)({
+                cert_file_name: env_1.env.ssl_cert,
+                key_file_name: env_1.env.ssl_key
+            });
+        }
+        else {
+            this.app = (0, uWebSockets_js_1.App)({});
+        }
     }
     startListening() {
         this.app.listen(env_1.env.host, this.port, (listenSocket) => {

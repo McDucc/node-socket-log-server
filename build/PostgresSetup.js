@@ -7,15 +7,15 @@ const postgres_1 = __importDefault(require("postgres"));
 const env_1 = require("./env");
 function SetupPostgresPool() {
     return new postgres_1.default({
-        user: env_1.env.postgres_user,
-        host: env_1.env.postgres_host,
-        port: env_1.env.postgres_port,
-        database: env_1.env.postgres_database,
-        schema: env_1.env.postgres_schema,
-        socket: env_1.env.postgres_socket,
-        password: env_1.env.postgres_password,
-        threads: env_1.env.postgres_threads,
-        queueSize: 32768,
+        user: env_1.env.postgres.user,
+        host: env_1.env.postgres.host,
+        port: env_1.env.postgres.port,
+        database: env_1.env.postgres.database,
+        schema: env_1.env.postgres.schema,
+        socket: env_1.env.postgres.socket,
+        password: env_1.env.postgres.password,
+        threads: env_1.env.postgres.threads,
+        queueSize: 65536,
         escapeChar: '\\'
     });
 }

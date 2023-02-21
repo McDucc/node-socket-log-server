@@ -104,6 +104,15 @@ export default class FrontEndcontroller extends HasApp {
             return entry.server;
         });
 
+        let query2 = await this.postgresPool.query("get-servers-metrics", "SELECT DISTINCT server from metrics ORDER BY server DESC", []);
+        let data2 = query2.map(entry => {
+            return entry.server;
+        });
+
+        data2.forEach(element => {
+            if (!data.includes(element)) data.push(element);
+        })
+
         EndReponse(response, JSON.stringify(data));
     }
 
@@ -114,13 +123,11 @@ export default class FrontEndcontroller extends HasApp {
             return EndReponse(response, 'Unauthenticated');
         }
 
-        let data = await this.getChannelArray();
-
-        EndReponse(response, JSON.stringify(data));
+        EndReponse(response, JSON.stringify(await this.getChannelArray()));
     }
 
     async getChannelArray(): Promise<string[]> {
-        let query = await this.postgresPool.query("get-channels", "SELECT DISTINCT channel from logs WHERE channel != 'metrics' ORDER BY channel DESC", []);
+        let query = await this.postgresPool.query("get-channels", "SELECT DISTINCT channel from logs ORDER BY channel DESC", []);
         let data = query.map(entry => {
             return entry.channel;
         });
@@ -132,13 +139,12 @@ export default class FrontEndcontroller extends HasApp {
             parameters.page < 0 ||
             parameters.pageSize < 1 ||
             parameters.minimumLevel > parameters.maximumLevel ||
-            !Array.isArray(parameters.servers); //TODO
+            !Array.isArray(parameters.servers);
     }
 
     async searchMetrics(request: RequestData, response: HttpResponse) {
         await this.search(request, response, 'metrics');
     }
-
 
     async search(request: RequestData, response: HttpResponse, mode: 'metrics' | 'database' = 'database') {
         if (request.headers['auth-token'] != env.logger_password) {
@@ -152,6 +158,9 @@ export default class FrontEndcontroller extends HasApp {
         try {
             this.searchLock++;
             let data = JSON.parse(request.data);
+
+            data.intervalStart = Math.max(0, data.intervalStart);
+            data.intervalEnd = Math.min(Date.now(), data.intervalEnd);
 
             if (mode === 'metrics') {
                 await this.metricsSearch(data, response);
@@ -187,8 +196,8 @@ export default class FrontEndcontroller extends HasApp {
                 parameters.channels,
                 parameters.minimumLevel,
                 parameters.maximumLevel,
-                parameters.intervalEnd,
                 parameters.intervalStart,
+                parameters.intervalEnd,
                 parameters.page * parameters.pageSize,
                 parameters.pageSize);
 
@@ -205,8 +214,9 @@ export default class FrontEndcontroller extends HasApp {
         let parameters: MetricsParameters = parametersRaw;
 
         let data = await this.metricsLookup(
+            parameters.intervalStart,
             parameters.intervalEnd,
-            parameters.intervalStart);
+            parameters.resolution);
 
         response.writeStatus('200 OK');
         response.writeHeader('Content-Encoding', 'gzip');
@@ -214,7 +224,7 @@ export default class FrontEndcontroller extends HasApp {
     }
 
     searchQuery1Name = 'search-query-1';
-    searchQuery1 = `SELECT level,server,time,message,data FROM ${env.postgres_table} WHERE 
+    searchQuery1 = `SELECT level,server,time,message,data FROM ${env.postgres.logs_table} WHERE 
     search @@ plainto_tsquery($1)
     AND channel = ANY($2)
     AND level BETWEEN $3 AND $4
@@ -223,7 +233,7 @@ export default class FrontEndcontroller extends HasApp {
     OFFSET $8 LIMIT $9`;
 
     searchQuery2Name = 'search-query-2';
-    searchQuery2 = `SELECT level,server,time,message,data FROM ${env.postgres_table} WHERE 
+    searchQuery2 = `SELECT level,server,time,message,data FROM ${env.postgres.logs_table} WHERE 
     search @@ plainto_tsquery($1)
     AND channel = ANY($2)
     AND level BETWEEN $3 AND $4
@@ -231,7 +241,7 @@ export default class FrontEndcontroller extends HasApp {
     OFFSET $7 LIMIT $8`;
 
     searchQuery1CountName = 'search-query-1-count';
-    searchQuery1Count = `SELECT COUNT(*) as count FROM ${env.postgres_table} WHERE 
+    searchQuery1Count = `SELECT COUNT(*) as count FROM ${env.postgres.logs_table} WHERE 
     search @@ plainto_tsquery($1)
     AND channel = ANY($2)
     AND level BETWEEN $3 AND $4
@@ -239,29 +249,39 @@ export default class FrontEndcontroller extends HasApp {
     AND time BETWEEN $6 AND $7`;
 
     searchQuery2CountName = 'search-query-2-count';
-    searchQuery2Count = `SELECT COUNT(*) as count FROM ${env.postgres_table} WHERE 
+    searchQuery2Count = `SELECT COUNT(*) as count FROM ${env.postgres.logs_table} WHERE 
     search @@ plainto_tsquery($1)
     AND channel = ANY($2)
     AND level BETWEEN $3 AND $4
     AND time BETWEEN $5 AND $6`;
 
-    metricsQueryName = 'search-query-2-count';
-    metricsQuery = `SELECT server,time,data FROM ${env.postgres_table} WHERE 
-    channel = 'metrics'
-    AND level = 0
-    AND time BETWEEN $1 AND $2`;
+    metricsQueryName = 'search-metrics';
+    metricsQuery = `SELECT
+    server,
+    ROUND(AVG(cpu)::numeric,3) AS cpu,
+    ROUND(AVG(mem_used)::numeric,3) AS mem_used,
+    ROUND(AVG(io_read)::numeric,3) AS io_read,
+    ROUND(AVG(io_write)::numeric,3) AS io_write,
+    ROUND(AVG(disk_used)::numeric,3) AS disk_used,
+    ROUND(AVG(net_in)::numeric,3) AS net_in,
+    ROUND(AVG(net_out)::numeric,3) AS net_out,
+    FLOOR((time - $1 + 0.00001) / ($2::numeric - $1) * $3) as slice FROM ${env.postgres.metrics_table} WHERE
+    time BETWEEN $1 AND $2
+    GROUP BY slice, server
+    ORDER BY slice`;
 
     async metricsLookup(
         minimumTime: number,
-        maximumTime: number): Promise<SearchResult> {
+        maximumTime: number,
+        resolution: number = 30): Promise<SearchResult> {
 
-        let data = await this.postgresPool.query(this.metricsQueryName, this.metricsQuery, [minimumTime, maximumTime]);
+        let data = await this.postgresPool.query(this.metricsQueryName, this.metricsQuery, [minimumTime, maximumTime, resolution]);
 
         return {
             data,
-            entryCount: 0,
+            entryCount: data.length,
             page: 0,
-            pageSize: 0
+            pageSize: resolution
         }
     }
 
@@ -328,6 +348,7 @@ class SearchParameters {
 class MetricsParameters {
     intervalStart: number = 0;
     intervalEnd: number = 0;
+    resolution: number = 30;
 }
 
 class SearchResult {

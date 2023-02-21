@@ -3,15 +3,15 @@ import { env } from "./env";
 
 export default function SetupPostgresPool() {
     return new Postgres({
-        user: env.postgres_user,
-        host: env.postgres_host,
-        port: env.postgres_port,
-        database: env.postgres_database,
-        schema: env.postgres_schema,
-        socket: env.postgres_socket,
-        password: env.postgres_password,
-        threads: env.postgres_threads,
-        queueSize: 32768,
+        user: env.postgres.user,
+        host: env.postgres.host,
+        port: env.postgres.port,
+        database: env.postgres.database,
+        schema: env.postgres.schema,
+        socket: env.postgres.socket,
+        password: env.postgres.password,
+        threads: env.postgres.threads,
+        queueSize: 65536,
         escapeChar: '\\'
     });
 }

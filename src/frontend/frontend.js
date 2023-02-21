@@ -26,15 +26,6 @@ async function updateChannelList() {
     Alpine.store('log').channels = json;
 }
 
-const cpu_load = 'cpu';
-const ram_used = 'ru';
-const disk_read = 'dr';
-const disk_write = 'dw'
-const disk_used = 'du';
-const traffic_in = 'tin';
-const traffic_out = 'tout';
-const metrics = [cpu_load, ram_used, disk_read, disk_write, disk_used, traffic_in, traffic_out];
-
 function getTimestamps(fieldIndex) {
 
     let timeframe = Alpine.store('controls').timeframeType == 'since';
@@ -54,34 +45,35 @@ let metricsCompiled = {};
 async function updateMetrics() {
     try {
         let data = basicPost();
+        let resolution = 30;
+
         data.body = JSON.stringify({
-            intervalStart: getTimestamps(0),
-            intervalEnd: getTimestamps(1),
+            intervalStart: Math.min(getTimestamps(0), getTimestamps(1)),
+            intervalEnd: Math.max(getTimestamps(0), getTimestamps(1)),
+            resolution
         });
 
-        console.log('Metrics request:', data.body);
+        console.log(data);
 
         let response = await fetch('/metrics', data);
         let json = await response.json();
-        let resolution = 20;
 
-        console.log('Metrics result:', json);
 
-        if (Array.isArray(response.data)) {
+
+        if (Array.isArray(json.data)) {
+            console.log(json.data);
             metricsCompiled = {};
-            let index = 0;
-            json.data.forEach(metricEntry => {
-                let realIndex = Math.floor(index / resolution);
-                if (metricsCompiled[metricEntry.server] == undefined) metricsCompiled[metricEntry.server] = {};
-                for (let metricKey of Object.keys(metricEntry.data)) {
-                    if (metricsCompiled[metricEntry.server][metricKey] == undefined) {
-                        metricsCompiled[metricEntry.server][metricKey] = [];
-                        for (let i = 0; i < resolution; i++)  metricsCompiled[metricEntry.server][metricKey][i] = 0;
-                    }
-                    metricsCompiled[metricEntry.server][metricKey][realIndex] += metricEntry.data[metricKey] / resolution;
+            metricsCompiledLabels = {};
+            for (let metricEntry of json.data) {
+                metricsCompiled[metricEntry.server] ??= {};
+                metricsCompiledLabels[metricEntry.server] ??= {};
+                for (let metricKey of Alpine.store('controls').metrics) {
+                    metricsCompiled[metricEntry.server][metricKey] ??= [];
+                    metricsCompiledLabels[metricEntry.server][metricKey] ??= [];
+                    metricsCompiled[metricEntry.server][metricKey][metricEntry.slice] = metricEntry[metricKey];
+                    metricsCompiledLabels[metricEntry.server][metricKey].push(metricEntry.slice)
                 }
-                index++;
-            });
+            };
         }
     } catch (err) {
         console.log(err);
@@ -121,7 +113,7 @@ setInterval(async () => {
             updatingMetrics = false;
         }
     }
-}, 10000);
+}, 5000);
 
 let lastAutoUpdate = 0;
 setInterval(async () => {
@@ -147,6 +139,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.store('controls', {
         datetime1: new Date().toISOString().split('.')[0],
         datetime2: new Date().toISOString().split('.')[0],
+        metrics: ['cpu', 'mem_used', 'disk_used', 'io_read', 'io_write', 'net_in', 'net_out'],
         showModal: true,
         showServerMetrics: false,
         autoUpdate: false,
@@ -213,12 +206,19 @@ async function search(searchTerm, minimumLevel, maximumLevel, page, pageSize) {
 let charts = {};
 async function syncCharts() {
     try {
-        let charts = document.getElementsByClassName('metric-canvas');
-        for (let element of charts) {
-            let chartName = element.id;
-            makeOrUpdateChart(metricsCompiled[chartName], chartName, metricsCompiledLabels[chartName], element);
-            await new Promise(resolve => setTimeout(resolve, 10));
-        };
+        let servers = Object.keys(metricsCompiled);
+
+        for (let server of servers) {
+            for (let metric of Object.keys(metricsCompiled[server])) {
+                let element = document.getElementById(server + ':' + metric);
+                let chartName = server + ' - ' + translate('metrics_' + metric);
+                if (element)
+                    makeOrUpdateChart(metricsCompiled[server][metric], chartName, metricsCompiledLabels[server][metric], element);
+            }
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+
     } catch (err) {
         console.log(err);
     }
@@ -246,11 +246,12 @@ function makeOrUpdateChart(chartData, chartName, chartLabels, element) {
                     data: chartData,
                     fill: true,
                     backgroundColor: '#07429b',
-                    borderColor: '#002468',
+                    borderColor: '#247bff',
                     tension: 0.1
                 }]
             },
             options: {
+                maintainAspectRatio: false,
                 plugins: {
                     legend: {
                         labels: {
@@ -274,16 +275,24 @@ function makeOrUpdateChart(chartData, chartName, chartLabels, element) {
 
 function prettifyJson(json) {
     //Remove critical characters
-    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    json = json
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
     return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
         let type = 'alx-number';
         if (/^"/.test(match)) {
-            type = /:$/.test(match) ? 'alx-key' : 'alx-string';
+            if (/:$/.test(match)) {
+                return '<br><span class="alx-key">' + match + '</span>';
+            }
+            type = 'alx-string';
         } else if (/true|false/.test(match)) {
             type = 'alx-boolean';
         } else if (/null/.test(match)) {
             type = 'alx-null';
         }
+
         return '<span class="' + type + '">' + match + '</span>';
     });
 }

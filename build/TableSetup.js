@@ -1,15 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const env_1 = require("./env");
-async function TableSetup(pool) {
+async function c(pool) {
     await new Promise((res) => {
         setTimeout(() => {
-            res(1);
+            res(true);
         }, 2500);
     });
     let table_columns = await pool.query('table-info', `SELECT column_name FROM information_schema.columns
         WHERE table_schema = $1
-        AND table_name = $2;`, [env_1.env.schema, env_1.env.table]);
+        AND table_name = $2;`, [env_1.env.postgres.schema, env_1.env.postgres.logs_table]);
     if (table_columns.length === 0) {
         let client = await pool.connect();
         console.log(`[${new Date().toISOString()}] Running table setup as logs table (${env_1.env.postgres.logs_table}) does not exist.`);
@@ -43,8 +43,8 @@ async function TableSetup(pool) {
                 id BIGSERIAL PRIMARY KEY,
                 name VARCHAR(128),
                 description VARCHAR(256),
-                table ENUM('metrics','logs'),
-                column string,
+                type VARCHAR(16),
+                value VARCHAR(16),
                 threshold REAL,
                 time INT);`);
             console.log(`[${new Date().toISOString()}] Created triggers table as ${env_1.env.postgres.triggers_table}`);
@@ -73,23 +73,23 @@ async function TableSetup(pool) {
             EXECUTE PROCEDURE logs_search_tsvector_update(); `);
             console.log(`[${new Date().toISOString()}] Created trigger logs_search_tsvector_trigger`);
             await client.queryString(`
-            CREATE INDEX level_index ON ${env_1.env.postgres.logs_table} USING BTREE(level); `);
+            CREATE INDEX logs_level_index ON ${env_1.env.postgres.logs_table} USING BTREE(level); `);
             await client.queryString(`
-            CREATE INDEX time_index ON ${env_1.env.postgres.logs_table} USING BTREE(time); `);
+            CREATE INDEX logs_time_index ON ${env_1.env.postgres.logs_table} USING BTREE(time); `);
             await client.queryString(`
-            CREATE INDEX channel_index ON ${env_1.env.postgres.logs_table} USING HASH(channel); `);
+            CREATE INDEX logs_channel_index ON ${env_1.env.postgres.logs_table} USING HASH(channel); `);
             await client.queryString(`
-            CREATE INDEX server_index ON ${env_1.env.postgres.logs_table} USING HASH(server); `);
+            CREATE INDEX logs_server_index ON ${env_1.env.postgres.logs_table} USING HASH(server); `);
             await client.queryString(`
-            CREATE INDEX search_index ON ${env_1.env.postgres.logs_table} USING GIN(search); `);
+            CREATE INDEX logs_search_index ON ${env_1.env.postgres.logs_table} USING GIN(search); `);
             await client.queryString(`
-            CREATE INDEX trigger_id_index ON ${env_1.env.postgres.triggers_table} USING BTREE(trigger_id); `);
+            CREATE INDEX trigger_messages_trigger_id_index ON ${env_1.env.postgres.trigger_messages_table} USING BTREE(trigger_id); `);
             await client.queryString(`
-            CREATE INDEX time_index ON ${env_1.env.postgres.trigger_messages_table} USING BTREE(time);`);
+            CREATE INDEX trigger_messages_time_index ON ${env_1.env.postgres.trigger_messages_table} USING BTREE(time);`);
             await client.queryString(`
-            CREATE INDEX time_index ON ${env_1.env.postgres.metrics} USING BTREE(time);`);
+            CREATE INDEX metrics_time_index ON ${env_1.env.postgres.metrics_table} USING BTREE(time);`);
             await client.queryString(`
-            CREATE INDEX server_index ON ${env_1.env.postgres.metrics} USING HASH(server); `);
+            CREATE INDEX metrics_server_index ON ${env_1.env.postgres.metrics_table} USING HASH(server); `);
             console.log(`[${new Date().toISOString()}] Created indexes`);
         }
         catch (err) {
@@ -100,10 +100,10 @@ async function TableSetup(pool) {
         console.log(`[${new Date().toISOString()}] Table Setup successful`);
         return true;
     }
-    let required_columns = ["id", "level", "time", "channel", "message", "data"];
+    let required_columns = ["id", "level", "time", "server", "channel", "message", "data", "search"];
     for (let column of table_columns) {
-        if (required_columns.indexOf(column.column_name) === -1) {
-            console.log(`[${new Date().toISOString()}]Table Setup failed: Logs table ${env_1.env.postgres.logs_table} exists but does not contain the required columns`);
+        if (!required_columns.includes(column.column_name)) {
+            console.log(`[${new Date().toISOString()}] Table setup failed: Logs table ${env_1.env.postgres.logs_table} exists but does not contain the required columns`);
             return false;
         }
     }
@@ -111,4 +111,4 @@ async function TableSetup(pool) {
     console.log(`[${new Date().toISOString()}] If you were expecting the setup to execute, please consult the documentation's troubleshooting section`);
     return true;
 }
-exports.default = TableSetup;
+exports.default = c;

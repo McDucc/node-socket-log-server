@@ -6,22 +6,20 @@ export default class HasApp {
     protected app: TemplatedApp;
 
     constructor(public port: number) {
-
-        /*
-        * Please report uncaught exceptions on github.
-        */
+        
         process.on('uncaughtException', function (err) {
             console.log(err);
             process.exit(1);
         });
 
-        /*
-        this.app = SSLApp({
-            cert_file_name: env.ssl_cert,
-            key_file_name: env.ssl_key
-         });*/
-
-        this.app = App({});
+        if (env.ssl) {
+            this.app = SSLApp({
+                cert_file_name: env.ssl_cert,
+                key_file_name: env.ssl_key
+            });
+        } else {
+            this.app = App({});
+        }
     }
 
     startListening() {

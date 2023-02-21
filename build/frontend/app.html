@@ -71,7 +71,7 @@
                     <div x-show="$store.controls.timeframeType == 'since'">
                         <select class="form-control mt-2" x-model="$store.controls.timeSelect">
                             <template x-for="val in [5,10,15,30,60]">
-                                <option x-text="val + translate('minutes')" :value="val*1000"></option>
+                                <option x-text="val + translate('minutes')" :value="val*1000*60"></option>
                             </template>
                             <template x-for="val in [2,4,8,24,48]">
                                 <option x-text="val + translate('hours')" :value="val*60*60*1000"></option>
@@ -124,10 +124,10 @@
         <div class="bd-example row col-md-12 mt-4 alx-messages" x-show="$store.controls.showServerMetrics">
             <template x-for="server in $store.log.servers">
                 <div class="bd-example col-md-12 mt-2">
-                    <div x-text="server.name" class="text-center"></div>
+                    <div x-text="server" class="text-center"></div>
                     <template x-for="metric in $store.controls.metrics">
-                        <div class="col-md-3 float-start p-5">
-                            <canvas class="metric-canvas" :id="server.name + ': ' + metric"></canvas>
+                        <div class="col-md-3 float-start p-2">
+                            <canvas class="metric-canvas" :id="server + ':' + metric"></canvas>
                         </div>
                     </template>
                 </div>

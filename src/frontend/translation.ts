@@ -25,7 +25,14 @@ function initializeTranslation(Alpine: any) {
             data: 'Data:',
             password: 'Password:',
             text: 'Close',
-            authenticate: 'Authenticate'
+            authenticate: 'Authenticate',
+            metrics_cpu: 'CPU Load',
+            metrics_mem_used: 'Memory Used %',
+            metrics_disk_used: 'Disk Used %',
+            metrics_io_write: 'Write IO /s',
+            metrics_io_read: 'Read IO /s',
+            metrics_net_in: 'Traffic In MB/s',
+            metrics_net_out: 'Traffic Out MB/s',
         },
     });
 
