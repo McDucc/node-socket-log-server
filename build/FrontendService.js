@@ -101,8 +101,19 @@ class FrontEndcontroller extends HasApp_1.default {
     ROUND(AVG(disk_used)::numeric,3) AS disk_used,
     ROUND(AVG(net_in)::numeric,3) AS net_in,
     ROUND(AVG(net_out)::numeric,3) AS net_out,
+    0 AS error_rate,
     FLOOR((time - $1 + 0.00001) / ($2::numeric - $1) * $3) as slice FROM ${env_1.env.postgres.metrics_table} WHERE
     time BETWEEN $1 AND $2
+    GROUP BY slice, server
+    ORDER BY slice`;
+        this.errorRateQueryName = 'error-rate';
+        this.errorRateQuery = `SELECT
+    server,
+    COUNT(*) as error_rate,
+    FLOOR((time - $1 + 0.00001) / ($2::numeric - $1) * $3) as slice
+    FROM logs WHERE
+    time BETWEEN $1 AND $2
+    AND level > $4
     GROUP BY slice, server
     ORDER BY slice`;
         this.postgresPool = (0, PostgresSetup_1.default)();
@@ -244,11 +255,20 @@ class FrontEndcontroller extends HasApp_1.default {
     }
     async metricsLookup(minimumTime, maximumTime, resolution = 30) {
         let data = await this.postgresPool.query(this.metricsQueryName, this.metricsQuery, [minimumTime, maximumTime, resolution]);
+        let errorRate = await this.postgresPool.query(this.errorRateQueryName, this.errorRateQuery, [minimumTime, maximumTime, resolution, env_1.env.error_rate_level]);
+        data.forEach(dataElement => {
+            errorRate.forEach(errorRateElement => {
+                if (dataElement.slice == errorRateElement.slice && dataElement.server == errorRateElement.server) {
+                    return dataElement.error_rate = errorRateElement.error_rate;
+                }
+            });
+        });
         return {
             data,
             entryCount: data.length,
-            page: 0,
-            pageSize: resolution
+            resolution,
+            intervalStart: minimumTime,
+            intervalEnd: maximumTime
         };
     }
     async databaseLookup(searchTerm, servers, channels, minimumLevel, maximumLevel, minimumTime, maximumTime, offset, pageSize) {
@@ -276,10 +296,8 @@ class FrontEndcontroller extends HasApp_1.default {
             let serverCasted = '{' + servers.join(',') + '}';
             if (searchTerm === undefined) {
                 let parameters1 = [channelsCasted, minimumLevel, maximumLevel, serverCasted, minimumTime, maximumTime, offset, pageSize];
-                console.log(parameters1);
                 data = await this.postgresPool.query(this.searchQuery3Name, this.searchQuery3, parameters1);
                 let parameters2 = [channelsCasted, minimumLevel, maximumLevel, serverCasted, minimumTime, maximumTime];
-                console.log(parameters2);
                 entryCount = (await this.postgresPool.query(this.searchQuery3CountName, this.searchQuery3Count, parameters2))[0].count;
             }
             else {
@@ -323,5 +341,14 @@ class SearchResult {
         this.data = [];
         this.pageSize = 0;
         this.page = 0;
+    }
+}
+class MetricsResult {
+    constructor() {
+        this.entryCount = 0;
+        this.data = [];
+        this.resolution = 0;
+        this.intervalStart = 0;
+        this.intervalEnd = 0;
     }
 }

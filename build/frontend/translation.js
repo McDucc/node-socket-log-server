@@ -34,6 +34,7 @@ function initializeTranslation(Alpine) {
             metrics_io_read: 'Read IO /s',
             metrics_net_in: 'Traffic In MB/s',
             metrics_net_out: 'Traffic Out MB/s',
+            metrics_error_rate: 'Error Rate',
         },
     });
     return (index) => {

@@ -277,23 +277,45 @@ export default class FrontEndcontroller extends HasApp {
     ROUND(AVG(disk_used)::numeric,3) AS disk_used,
     ROUND(AVG(net_in)::numeric,3) AS net_in,
     ROUND(AVG(net_out)::numeric,3) AS net_out,
+    0 AS error_rate,
     FLOOR((time - $1 + 0.00001) / ($2::numeric - $1) * $3) as slice FROM ${env.postgres.metrics_table} WHERE
     time BETWEEN $1 AND $2
+    GROUP BY slice, server
+    ORDER BY slice`;
+
+    errorRateQueryName = 'error-rate';
+    errorRateQuery = `SELECT
+    server,
+    COUNT(*) as error_rate,
+    FLOOR((time - $1 + 0.00001) / ($2::numeric - $1) * $3) as slice
+    FROM logs WHERE
+    time BETWEEN $1 AND $2
+    AND level > $4
     GROUP BY slice, server
     ORDER BY slice`;
 
     async metricsLookup(
         minimumTime: number,
         maximumTime: number,
-        resolution: number = 30): Promise<SearchResult> {
+        resolution: number = 30): Promise<MetricsResult> {
 
         let data = await this.postgresPool.query(this.metricsQueryName, this.metricsQuery, [minimumTime, maximumTime, resolution]);
+        let errorRate = await this.postgresPool.query(this.errorRateQueryName, this.errorRateQuery, [minimumTime, maximumTime, resolution, env.error_rate_level])
+
+        data.forEach(dataElement => {
+            errorRate.forEach(errorRateElement => {
+                if (dataElement.slice == errorRateElement.slice && dataElement.server == errorRateElement.server) {
+                    return dataElement.error_rate = errorRateElement.error_rate;
+                }
+            });
+        });
 
         return {
             data,
             entryCount: data.length,
-            page: 0,
-            pageSize: resolution
+            resolution,
+            intervalStart: minimumTime,
+            intervalEnd: maximumTime
         }
     }
 
@@ -385,4 +407,12 @@ class SearchResult {
     data: any[] = [];
     pageSize: number = 0;
     page: number = 0;
+}
+
+class MetricsResult {
+    entryCount: number = 0;
+    data: any[] = [];
+    resolution: number = 0;
+    intervalStart: number = 0;
+    intervalEnd: number = 0;
 }

@@ -126,7 +126,7 @@
                 <div class="bd-example col-md-12 mt-2">
                     <div x-text="server" class="text-center"></div>
                     <template x-for="metric in $store.controls.metrics">
-                        <div class="col-md-3 float-start p-2">
+                        <div class="col-md-6 float-start p-2" style="min-height: 300px;">
                             <canvas class="metric-canvas" :id="server + ':' + metric"></canvas>
                         </div>
                     </template>

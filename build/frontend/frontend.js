@@ -45,7 +45,7 @@ let metricsCompiled = {};
 async function updateMetrics() {
     try {
         let data = basicPost();
-        let resolution = 30;
+        let resolution = 15;
 
         data.body = JSON.stringify({
             intervalStart: Math.min(getTimestamps(0), getTimestamps(1)),
@@ -58,7 +58,10 @@ async function updateMetrics() {
         let response = await fetch('/metrics', data);
         let json = await response.json();
 
-
+        let intervalStart = json.intervalStart;
+        let intervalEnd = json.intervalEnd;
+        resolution = json.resolution;
+        let timePerSlice = (intervalEnd - intervalStart) / resolution;
 
         if (Array.isArray(json.data)) {
             console.log(json.data);
@@ -71,7 +74,8 @@ async function updateMetrics() {
                     metricsCompiled[metricEntry.server][metricKey] ??= [];
                     metricsCompiledLabels[metricEntry.server][metricKey] ??= [];
                     metricsCompiled[metricEntry.server][metricKey][metricEntry.slice] = metricEntry[metricKey];
-                    metricsCompiledLabels[metricEntry.server][metricKey].push(metricEntry.slice)
+                    let time = new Date(intervalStart + metricEntry.slice * timePerSlice).toISOString().split('.')[0].replace('T', ' ');
+                    metricsCompiledLabels[metricEntry.server][metricKey].push(time);
                 }
             };
         }
@@ -139,7 +143,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.store('controls', {
         datetime1: new Date().toISOString().split('.')[0],
         datetime2: new Date().toISOString().split('.')[0],
-        metrics: ['cpu', 'mem_used', 'disk_used', 'io_read', 'io_write', 'net_in', 'net_out'],
+        metrics: ['cpu', 'mem_used', 'disk_used', 'io_read', 'io_write', 'net_in', 'net_out', 'error_rate'],
         showModal: true,
         showServerMetrics: false,
         autoUpdate: false,
@@ -250,6 +254,7 @@ function makeOrUpdateChart(chartData, chartName, chartLabels, element) {
                 }]
             },
             options: {
+                responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
