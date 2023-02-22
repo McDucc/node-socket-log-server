@@ -13,8 +13,17 @@
 }
 
 .alm {
-    background-color: #414549;
+    background-color: #242628;
     color: #dee2e6;
+}
+
+.alm-larger {
+    font-size: large;
+}
+
+pre {
+    font-family: monospace;
+    font-size: large;
 }
 
 .alx-key {
@@ -58,7 +67,8 @@
     padding: 1rem;
     margin: 1rem -.75rem 0;
     border: solid #dee2e6;
-    border-width: 1px 0 0
+    border-width: 1px 0 0;
+    background-color: #0d1215;
 }
 
 .bd-example::after {
@@ -111,7 +121,6 @@
 
 .alx-messages {
     margin: auto;
-    font-size: 15px;
     font-family: monospace;
 }
 

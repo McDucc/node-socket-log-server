@@ -142,13 +142,14 @@
                 </div>
             </template>
             <template x-for="message in $store.log.messages">
-                <div class="alert alert-dark alm">
+                <div class="alert alert-dark alm alm-larger">
                     <b x-text="translate('time')"></b> <span
                         x-text="new Date(parseInt(message.time)).toISOString().replaceAll('T',' ').replaceAll('Z',' ')"></span><br>
                     <b x-text="translate('message')"></b> <span x-text="message.message"></span><br>
                     <b x-text="translate('level')"></b> <span x-text="message.level"></span><br>
                     <b x-text="translate('server')"></b> <span x-text="message.server"></span><br>
-                    <b x-text="translate('data')"></b> <span x-html="prettifyJson(message.data)"></span><br>
+                    <b x-text="translate('data')"></b>
+                    <pre x-html="prettifyJson(JSON.stringify(JSON.parse(message.data), undefined, 2))"></pre>
                 </div>
             </template>
         </div>

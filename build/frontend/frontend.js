@@ -167,8 +167,7 @@ document.addEventListener('alpine:init', () => {
 
 let searchActive = false;
 async function search(searchTerm, minimumLevel, maximumLevel, page, pageSize) {
-    searchTerm = searchTerm.trim();
-    if (searchActive || !searchTerm) return;
+    if (searchActive) return;
 
     try {
         searchActive = true;
@@ -284,9 +283,10 @@ function prettifyJson(json) {
         let type = 'alx-number';
         if (/^"/.test(match)) {
             if (/:$/.test(match)) {
-                return '<br><span class="alx-key">' + match + '</span>';
+                type = 'alx-key';
+            } else {
+                type = 'alx-string';
             }
-            type = 'alx-string';
         } else if (/true|false/.test(match)) {
             type = 'alx-boolean';
         } else if (/null/.test(match)) {

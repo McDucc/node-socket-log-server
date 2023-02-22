@@ -19,8 +19,6 @@ export default class FrontEndcontroller extends HasApp {
 
     postgresPool: Postgres;
 
-    onAbortNoAction = () => { };
-
     //The search function is limited since it can be pretty intense for the server
     searchLockLimit = env.search_limit;
     searchLock = 0;
@@ -228,18 +226,18 @@ export default class FrontEndcontroller extends HasApp {
 
     searchQuery3Name = 'search-query-3';
     searchQuery3 = `SELECT level,server,time,message,data FROM ${env.postgres.logs_table} WHERE 
-    channel = ANY($2)
-    AND level BETWEEN $3 AND $4
-    AND server = ANY($5)
-    AND time BETWEEN $6 AND $7
-    OFFSET $8 LIMIT $9`;
+    channel = ANY($1)
+    AND level BETWEEN $2 AND $3
+    AND server = ANY($4)
+    AND time BETWEEN $5 AND $6
+    OFFSET $7 LIMIT $8`;
 
     searchQuery4Name = 'search-query-4';
     searchQuery4 = `SELECT level,server,time,message,data FROM ${env.postgres.logs_table} WHERE 
-    channel = ANY($2)
-    AND level BETWEEN $3 AND $4
-    AND time BETWEEN $5 AND $6
-    OFFSET $7 LIMIT $8`;
+    channel = ANY($1)
+    AND level BETWEEN $2 AND $3
+    AND time BETWEEN $4 AND $5
+    OFFSET $6 LIMIT $7`;
 
     searchQuery1CountName = 'search-query-1-count';
     searchQuery1Count = `SELECT COUNT(*) as count FROM ${env.postgres.logs_table} WHERE 
@@ -258,16 +256,16 @@ export default class FrontEndcontroller extends HasApp {
 
     searchQuery3CountName = 'search-query-3-count';
     searchQuery3Count = `SELECT COUNT(*) as count FROM ${env.postgres.logs_table} WHERE 
-    channel = ANY($2)
-    AND level BETWEEN $3 AND $4
-    AND server = ANY($5)
-    AND time BETWEEN $6 AND $7`;
+    channel = ANY($1)
+    AND level BETWEEN $2 AND $3
+    AND server = ANY($4)
+    AND time BETWEEN $5 AND $6`;
 
     searchQuery4CountName = 'search-query-4-count';
     searchQuery4Count = `SELECT COUNT(*) as count FROM ${env.postgres.logs_table} WHERE 
-    channel = ANY($2)
-    AND level BETWEEN $3 AND $4
-    AND time BETWEEN $5 AND $6`;
+    channel = ANY($1)
+    AND level BETWEEN $2 AND $3
+    AND time BETWEEN $4 AND $5`;
 
     metricsQueryName = 'search-metrics';
     metricsQuery = `SELECT
@@ -323,16 +321,16 @@ export default class FrontEndcontroller extends HasApp {
         if (servers === undefined) {
 
             if (searchTerm === undefined) {
-                let parameters1 = [channelsCasted, minimumLevel, maximumLevel, maximumTime, minimumTime, offset, pageSize];
-                data = await this.postgresPool.query(this.searchQuery4Name, this.searchQuery2, parameters1);
+                let parameters1 = [channelsCasted, minimumLevel, maximumLevel, minimumTime, maximumTime, offset, pageSize];
+                data = await this.postgresPool.query(this.searchQuery4Name, this.searchQuery4, parameters1);
 
-                let parameters2 = [channelsCasted, minimumLevel, maximumLevel, maximumTime, minimumTime];
-                entryCount = (await this.postgresPool.query(this.searchQuery4CountName, this.searchQuery2Count, parameters2))[0].count;
+                let parameters2 = [channelsCasted, minimumLevel, maximumLevel, minimumTime, maximumTime,];
+                entryCount = (await this.postgresPool.query(this.searchQuery4CountName, this.searchQuery4Count, parameters2))[0].count;
             } else {
-                let parameters1 = [searchTerm, channelsCasted, minimumLevel, maximumLevel, maximumTime, minimumTime, offset, pageSize];
-                data = await this.postgresPool.query(this.searchQuery2Name, this.searchQuery2, parameters1);
+                let parameters1 = [searchTerm, channelsCasted, minimumLevel, maximumLevel, minimumTime, maximumTime, offset, pageSize];
+                data = await this.postgresPool.query(this.searchQuery2Name, this.searchQuery4, parameters1);
 
-                let parameters2 = [searchTerm, channelsCasted, minimumLevel, maximumLevel, maximumTime, minimumTime];
+                let parameters2 = [searchTerm, channelsCasted, minimumLevel, maximumLevel, minimumTime, maximumTime];
                 entryCount = (await this.postgresPool.query(this.searchQuery2CountName, this.searchQuery2Count, parameters2))[0].count;
             }
 
@@ -341,16 +339,16 @@ export default class FrontEndcontroller extends HasApp {
             let serverCasted = '{' + servers.join(',') + '}';
 
             if (searchTerm === undefined) {
-                let parameters1 = [channelsCasted, minimumLevel, maximumLevel, serverCasted, maximumTime, minimumTime, offset, pageSize];
-                data = await this.postgresPool.query(this.searchQuery3Name, this.searchQuery1, parameters1);
+                let parameters1 = [channelsCasted, minimumLevel, maximumLevel, serverCasted, minimumTime, maximumTime, offset, pageSize];
+                data = await this.postgresPool.query(this.searchQuery3Name, this.searchQuery3, parameters1);
 
-                let parameters2 = [channelsCasted, minimumLevel, maximumLevel, serverCasted, maximumTime, minimumTime];
-                entryCount = (await this.postgresPool.query(this.searchQuery3CountName, this.searchQuery1Count, parameters2))[0].count;
+                let parameters2 = [channelsCasted, minimumLevel, maximumLevel, serverCasted, minimumTime, maximumTime];
+                entryCount = (await this.postgresPool.query(this.searchQuery3CountName, this.searchQuery3Count, parameters2))[0].count;
             } else {
-                let parameters1 = [searchTerm, channelsCasted, minimumLevel, maximumLevel, serverCasted, maximumTime, minimumTime, offset, pageSize];
+                let parameters1 = [searchTerm, channelsCasted, minimumLevel, maximumLevel, serverCasted, minimumTime, maximumTime, offset, pageSize];
                 data = await this.postgresPool.query(this.searchQuery1Name, this.searchQuery1, parameters1);
 
-                let parameters2 = [searchTerm, channelsCasted, minimumLevel, maximumLevel, serverCasted, maximumTime, minimumTime];
+                let parameters2 = [searchTerm, channelsCasted, minimumLevel, maximumLevel, serverCasted, minimumTime, maximumTime];
                 entryCount = (await this.postgresPool.query(this.searchQuery1CountName, this.searchQuery1Count, parameters2))[0].count;
             }
         }
