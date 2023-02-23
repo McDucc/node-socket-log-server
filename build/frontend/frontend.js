@@ -53,8 +53,6 @@ async function updateMetrics() {
             resolution
         });
 
-        console.log(data);
-
         let response = await fetch('/metrics', data);
         let json = await response.json();
 
@@ -64,7 +62,6 @@ async function updateMetrics() {
         let timePerSlice = (intervalEnd - intervalStart) / resolution;
 
         if (Array.isArray(json.data)) {
-            console.log(json.data);
             metricsCompiled = {};
             metricsCompiledLabels = {};
             for (let metricEntry of json.data) {
@@ -136,16 +133,18 @@ document.addEventListener('alpine:init', () => {
     Alpine.store('log', {
         servers: [],
         channels: [],
-        messages: []
+        messages: [],
+        trigger_messages: [],
+        triggers: []
     })
 
     //Need to refactor into class document id value calls
     Alpine.store('controls', {
-        datetime1: new Date().toISOString().split('.')[0],
-        datetime2: new Date().toISOString().split('.')[0],
+        datetime1: new Date().toISOString().substring(0, 19),
+        datetime2: new Date().toISOString().substring(0, 19),
         metrics: ['cpu', 'mem_used', 'disk_used', 'io_read', 'io_write', 'net_in', 'net_out', 'error_rate'],
-        showModal: true,
-        showServerMetrics: false,
+        showAuthModal: true,
+        showPage: 0,
         autoUpdate: false,
         autoUpdateSpeed: 3000,
         serverFilter: [],
@@ -189,12 +188,8 @@ async function search(searchTerm, minimumLevel, maximumLevel, page, pageSize) {
             channels: Object.values(Alpine.store('controls').channelFilter)
         });
 
-        console.log('Search request:', data.body);
-
         let response = await fetch('/search', data);
         let json = await response.json();
-
-        console.log('Search result:', json);
 
         Alpine.store('log').messages = json.data;
         Alpine.store('controls').pageSize = json.pageSize;

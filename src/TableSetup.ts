@@ -53,6 +53,7 @@ export default async function c(pool: Postgres): Promise<boolean> {
                 description VARCHAR(256),
                 type VARCHAR(16),
                 value VARCHAR(16),
+                active BOOLEAN,
                 threshold REAL,
                 time INT);`);
 

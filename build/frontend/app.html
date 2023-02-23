@@ -15,145 +15,213 @@
 </head>
 
 <body x-data class="body-base">
-    <div class="modal-overlay" x-show="$store.controls.showModal"></div>
-    <div class="modalx bd-example" x-show="$store.controls.showModal">
+    <div class="modal-overlay" x-show="$store.controls.showAuthModal || $store.controls.showTriggerModal"></div>
 
+    <!-- Auth modal -->
+    <div class="modalx bd-example" x-show="$store.controls.showAuthModal">
         <p class="mt-2" x-text="translate('password')"></p>
         <input class="form-control" type="text" x-model="$store.credentials.password"
-            @keydown.enter="$store.controls.showModal = false; authenticate();">
+            @keydown.enter="$store.controls.showAuthModal = false; authenticate();">
         <div class=" mt-4">
-            <button class="btn btn-primary" @click=" $store.controls.showModal=false; authenticate();"
+            <button class="btn btn-primary" @click=" $store.controls.showAuthModal=false; authenticate();"
                 x-text="translate('close')"></button>
         </div>
     </div>
+
     <div class="col-md-11 mt-3 m-auto">
         <a class="title-x blue-text">WS</a>
         <a class="title-x">Logger</a>
 
-
         <!-- Controls header -->
-        <div class="bd-example row col-md-12 mt-4 m-auto">
-            <div class="row mt-2">
-                <div class="col-md-12">
-                    <button class="alert btn btn-primary float-start" x-on:click="$store.controls.showModal = true;"
-                        x-text="translate('authenticate')">
-                    </button>
+        <div class="bd-base row col-md-12">
+            <div class="bd-example row col-md-12 mt-4 alx-messages">
+                <div class="row mt-2 justify-content-center">
+                    <div class="col-md-12">
+                        <div class="float-start col-md-2 p-1">
+                            <button class="alert btn btn-primary w-100"
+                                x-on:click="$store.controls.showAuthModal = true;" x-text="translate('authenticate')">
+                            </button>
+                        </div>
 
-                    <button class="alert btn btn-primary float-end"
-                        x-on:click="$store.controls.showServerMetrics ^= true"
-                        x-text="$store.controls.showServerMetrics ? 'Switch to messages' : 'Switch to metrics'">
-                    </button>
-                    <div class="alert alert-danger ms-4 float-start" x-show="$store.credentials.authenticated == 1"
-                        x-text="translate('credentials_incorrect')">
+                        <div class="float-start col-md-2 p-1" x-show="$store.credentials.authenticated == 0">
+                            <div class="alert alert-dark info-message-dark w-100 text-center"
+                                x-text="translate('auth_pending')">
+                            </div>
+                        </div>
+
+                        <div class="float-start col-md-2 p-1" x-show="$store.credentials.authenticated == 1">
+                            <div class="alert alert-danger w-100 text-center"
+                                x-text="translate('auth_credentials_incorrect')">
+                            </div>
+                        </div>
+
+                        <div class="float-start col-md-2 p-1" x-show="$store.credentials.authenticated == 2">
+                            <div class="alert alert-dark info-message-dark w-100 text-center"
+                                x-text="translate('auth_successful')">
+                            </div>
+                        </div>
+
+                        <div class="float-start col-md-2 p-1">
+                            <button class="alert btn btn-primary w-100" x-on:click="$store.controls.showPage=0"
+                                x-text="translate('page_logging')">
+                            </button>
+                        </div>
+
+                        <div class="float-start col-md-2 p-1">
+                            <button class="alert btn btn-primary w-100" x-on:click="$store.controls.showPage=1"
+                                x-text="translate('page_metrics')">
+                            </button>
+                        </div>
+
+                        <div class="float-start col-md-2 p-1">
+                            <button class="alert btn btn-primary w-100" x-on:click="$store.controls.showPage=2"
+                                x-text="translate('page_messages')">
+                            </button>
+                        </div>
+
+                        <div class="float-start col-md-2 p-1">
+                            <button class="alert btn btn-primary w-100" x-on:click="$store.controls.showPage=3"
+                                x-text="translate('page_triggers')">
+                            </button>
+                        </div>
                     </div>
-                    <div class="alert alert-dark ms-4 alm float-start" x-show="$store.credentials.authenticated == 2"
-                        x-text="translate('auth_successful')">
+                    <div class=" row mt-2">
+
+                        <!--Search Term-->
+                        <div class="col-md-3">
+                            <p x-text="translate('search_term')"></p>
+                            <input class="form-control" type="text" x-model="$store.controls.searchTerm">
+                            <button class="btn btn-primary form-control mt-2"
+                                x-bind:disabled="!!$store.controls.autoUpdate" x-text="translate('search')"></button>
+                        </div>
+
+                        <!--Timeframe-->
+                        <div class="col-md-3">
+                            <p x-text="translate('timeframe_type')"></p>
+                            <select x-model="$store.controls.timeframeType" class="form-control mt-2">
+                                <option value="since" selected x-text="translate('timeframe_type_since')"></option>
+                                <option value="timeframe" x-text="translate('timeframe_type_timeframe')"></option>
+                            </select>
+                            <div x-show="$store.controls.timeframeType == 'since'">
+                                <select class="form-control mt-2" x-model="$store.controls.timeSelect">
+                                    <template x-for="val in [5,10,15,30,60]">
+                                        <option x-text="val + translate('minutes')" :value="val*1000*60"></option>
+                                    </template>
+                                    <template x-for="val in [2,4,8,24,48]">
+                                        <option x-text="val + translate('hours')" :value="val*60*60*1000"></option>
+                                    </template>
+                                    <option x-text="translate('all_time')" :value="2000000000000"></option>
+                                </select>
+                            </div>
+                            <div x-show="$store.controls.timeframeType == 'timeframe'">
+                                <input class="form-control mt-1" type="datetime-local"
+                                    x-model="$store.controls.datetime1">
+                                <input class="form-control mt-1" type="datetime-local"
+                                    x-model="$store.controls.datetime2">
+                            </div>
+                        </div>
+
+                        <!--Update speed-->
+                        <div class="col-md-2">
+                            <p x-text="translate('update_speed')"></p>
+                            <select class="form-control mt-2" x-model="$store.controls.autoUpdateSpeed">
+                                <template x-for="val in [3,5,10,15,30,60]">
+                                    <option x-text="val + translate('seconds')" :value="val*1000"></option>
+                                </template>
+                            </select>
+                            <button class="btn btn-primary form-control mt-2"
+                                x-on:click="$store.controls.autoUpdate ^= true"
+                                x-text="$store.controls.autoUpdate ? translate('auto_update_active') : translate('auto_update_deactivated')"></button>
+                        </div>
+
+                        <!--Channel filer-->
+                        <div class="col-md-2">
+                            <p x-text="translate('filter_by_channel')"></p>
+                            <select class="form-control mt-2" x-model="$store.controls.channelFilter" multiple>
+                                <template x-for="channel in $store.log.channels">
+                                    <option x-bind:value="channel" x-text="channel"></option>
+                                </template>
+                            </select>
+                        </div>
+
+
+                        <!--Server filter-->
+                        <div class="col-md-2">
+                            <p x-text="translate('filter_by_server')"></p>
+                            <select class="form-control mt-2" x-model="$store.controls.serverFilter" multiple>
+                                <template x-for="server in $store.log.servers">
+                                    <option x-bind:value="server" x-text="server"></option>
+                                </template>
+                            </select>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class=" row mt-2">
 
-                <!--Search Term-->
-                <div class="col-md-3">
-                    <p x-text="translate('search_term')"></p>
-                    <input class="form-control" type="text" x-model="$store.controls.searchTerm">
-                    <button class="btn btn-primary form-control mt-2" x-bind:disabled="!!$store.controls.autoUpdate"
-                        x-text="translate('search')"></button>
-                </div>
-
-                <!--Timeframe-->
-                <div class="col-md-3">
-                    <p x-text="translate('timeframe_type')"></p>
-                    <select x-model="$store.controls.timeframeType" class="form-control mt-2">
-                        <option value="since" selected x-text="translate('timeframe_type_since')"></option>
-                        <option value="timeframe" x-text="translate('timeframe_type_timeframe')"></option>
-                    </select>
-                    <div x-show="$store.controls.timeframeType == 'since'">
-                        <select class="form-control mt-2" x-model="$store.controls.timeSelect">
-                            <template x-for="val in [5,10,15,30,60]">
-                                <option x-text="val + translate('minutes')" :value="val*1000*60"></option>
-                            </template>
-                            <template x-for="val in [2,4,8,24,48]">
-                                <option x-text="val + translate('hours')" :value="val*60*60*1000"></option>
-                            </template>
-                            <option x-text="translate('all_time')" :value="2000000000000"></option>
-                        </select>
-                    </div>
-                    <div x-show="$store.controls.timeframeType == 'timeframe'">
-                        <input class="form-control mt-1" type="datetime-local" x-model="$store.controls.datetime1">
-                        <input class="form-control mt-1" type="datetime-local" x-model="$store.controls.datetime2">
-                    </div>
-                </div>
-
-                <!--Update speed-->
-                <div class="col-md-2">
-                    <p x-text="translate('update_speed')"></p>
-                    <select class="form-control mt-2" x-model="$store.controls.autoUpdateSpeed">
-                        <template x-for="val in [3,5,10,15,30,60]">
-                            <option x-text="val + translate('seconds')" :value="val*1000"></option>
-                        </template>
-                    </select>
-                    <button class="btn btn-primary form-control mt-2" x-on:click="$store.controls.autoUpdate ^= true"
-                        x-text="$store.controls.autoUpdate ? translate('auto_update_active') : translate('auto_update_deactivated')"></button>
-                </div>
-
-                <!--Channel filer-->
-                <div class="col-md-2">
-                    <p x-text="translate('filter_by_channel')"></p>
-                    <select class="form-control mt-2" x-model="$store.controls.channelFilter" multiple>
-                        <template x-for="channel in $store.log.channels">
-                            <option x-bind:value="channel" x-text="channel"></option>
-                        </template>
-                    </select>
-                </div>
-
-
-                <!--Server filter-->
-                <div class="col-md-2">
-                    <p x-text="translate('filter_by_server')"></p>
-                    <select class="form-control mt-2" x-model="$store.controls.serverFilter" multiple>
-                        <template x-for="server in $store.log.servers">
-                            <option x-bind:value="server" x-text="server"></option>
-                        </template>
-                    </select>
-                </div>
-            </div>
-        </div>
-
-        <!-- Metrics Page -->
-        <div class="bd-example row col-md-12 mt-4 alx-messages" x-show="$store.controls.showServerMetrics">
-            <template x-for="server in $store.log.servers">
-                <div class="bd-example col-md-12 mt-2">
-                    <div x-text="server" class="text-center"></div>
-                    <template x-for="metric in $store.controls.metrics">
-                        <div class="col-md-6 float-start p-2" style="min-height: 300px;">
-                            <canvas class="metric-canvas" :id="server + ':' + metric"></canvas>
+                <!-- Logs Page -->
+                <div x-show="$store.controls.showPage === 0">
+                    <template x-for="i in $store.controls.lastPage">
+                        <div :class="i-1 == $store.controls.page ? 'btn btn-primary alx-selected' : 'btn btn-primary alx'"
+                            x-text="i" @click="$store.controls.page = i-1">
+                        </div>
+                    </template>
+                    <template x-for="message in $store.log.messages">
+                        <div class="alert alert-dark info-message-dark">
+                            <b x-text="translate('time')"></b> <span
+                                x-text="new Date(parseInt(message.time)).toISOString().replace(/Z|T/g,' ')"></span><br>
+                            <b x-text="translate('message')"></b> <span x-text="message.message"></span><br>
+                            <b x-text="translate('level')"></b> <span x-text="message.level"></span><br>
+                            <b x-text="translate('server')"></b> <span x-text="message.server"></span><br>
+                            <b x-text="translate('data')"></b>
+                            <pre x-html="prettifyJson(JSON.stringify(JSON.parse(message.data), undefined, 2))"></pre>
                         </div>
                     </template>
                 </div>
-            </template>
-        </div>
 
-        <!-- Logs Page -->
-        <div class="bd-example row col-md-12 mt-4 alx-messages" x-show="!$store.controls.showServerMetrics">
-            <template x-for="i in $store.controls.lastPage">
-                <div :class="i-1 == $store.controls.page ? 'btn btn-primary alx-selected' : 'btn btn-primary alx'"
-                    x-text="i" @click="$store.controls.page = i-1">
+                <!-- Metrics Page -->
+                <div x-show="$store.controls.showPage === 1">
+                    <template x-for="server in $store.log.servers">
+                        <div class="bd-example col-md-12 mt-2 info-message-dark">
+                            <div x-text="server" class="text-center"></div>
+                            <template x-for="metric in $store.controls.metrics">
+                                <div class="col-md-6 float-start p-2" style="min-height: 12.5em;">
+                                    <canvas class="metric-canvas" :id="server + ':' + metric"></canvas>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
                 </div>
-            </template>
-            <template x-for="message in $store.log.messages">
-                <div class="alert alert-dark alm alm-larger">
-                    <b x-text="translate('time')"></b> <span
-                        x-text="new Date(parseInt(message.time)).toISOString().replaceAll('T',' ').replaceAll('Z',' ')"></span><br>
-                    <b x-text="translate('message')"></b> <span x-text="message.message"></span><br>
-                    <b x-text="translate('level')"></b> <span x-text="message.level"></span><br>
-                    <b x-text="translate('server')"></b> <span x-text="message.server"></span><br>
-                    <b x-text="translate('data')"></b>
-                    <pre x-html="prettifyJson(JSON.stringify(JSON.parse(message.data), undefined, 2))"></pre>
+
+                <!-- Trigger Messages Page -->
+                <div x-show="$store.controls.showPage === 2">
+                    <template x-for="message in $store.log.trigger_messages">
+                        <div class="alert alert-dark info-message-dark">
+                            <b x-text="translate('time')"></b> <span
+                                x-text="new Date(parseInt(message.time)).toISOString().replace('/Z|T/g',' ')"></span><br>
+                            <b x-text="translate('message')"></b> <span x-text="message.message"></span><br>
+                            <b x-text="translate('level')"></b> <span x-text="message.level"></span><br>
+                            <b x-text="translate('server')"></b> <span x-text="message.server"></span><br>
+                            <b x-text="translate('data')"></b>
+                            <pre x-html="prettifyJson(JSON.stringify(JSON.parse(message.data), undefined, 2))"></pre>
+                        </div>
+                    </template>
                 </div>
-            </template>
+
+                <!-- Triggers Page -->
+                <div x-show="$store.controls.showPage === 3">
+                    <template x-for="message in $store.log.trigger_messages">
+                        <div class="alert alert-dark info-message-dark">
+                            <b x-text="translate('time')"></b> <span
+                                x-text="new Date(parseInt(message.time)).toISOString().replace('/Z|T/g',' ')"></span><br>
+                            <b x-text="translate('message')"></b> <span x-text="message.message"></span><br>
+                            <b x-text="translate('level')"></b> <span x-text="message.level"></span><br>
+                            <b x-text="translate('server')"></b> <span x-text="message.server"></span><br>
+                            <b x-text="translate('data')"></b>
+                            <pre x-html="prettifyJson(JSON.stringify(JSON.parse(message.data), undefined, 2))"></pre>
+                        </div>
+                    </template>
+                </div>
+            </div>
         </div>
-    </div>
 </body>
 
 </html>

@@ -45,6 +45,7 @@ async function c(pool) {
                 description VARCHAR(256),
                 type VARCHAR(16),
                 value VARCHAR(16),
+                active BOOLEAN,
                 threshold REAL,
                 time INT);`);
             console.log(`[${new Date().toISOString()}] Created triggers table as ${env_1.env.postgres.triggers_table}`);

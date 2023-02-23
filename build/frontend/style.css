@@ -12,13 +12,14 @@
     background-color: #80343a;
 }
 
-.alm {
-    background-color: #242628;
+.info-message-dark {
+    background-color: #181a1c !important;
     color: #dee2e6;
 }
 
-.alm-larger {
-    font-size: large;
+.info-message-base {
+    background-color: #19222b !important;
+    color: #dee2e6;
 }
 
 pre {
@@ -62,13 +63,19 @@ pre {
     margin-right: 0.25em !important;
 }
 
+.bd-base {
+    position: relative;
+    padding: 1rem;
+    margin: 1rem -.75rem 0;
+}
+
 .bd-example {
     position: relative;
     padding: 1rem;
     margin: 1rem -.75rem 0;
     border: solid #dee2e6;
     border-width: 1px 0 0;
-    background-color: #0d1215;
+    background-color: #19222b;
 }
 
 .bd-example::after {
@@ -92,6 +99,12 @@ pre {
     margin-top: 2rem
 }
 
+.btn-10 {
+    width: 15%;
+    min-width: 150px;
+    text-align: center;
+}
+
 .modalx {
     z-index: 100;
     width: 400px;
@@ -101,6 +114,17 @@ pre {
     top: 200;
     margin-left: -180px;
     margin-top: -150px;
+    padding: 15px;
+    background-color: rgb(33, 33, 33);
+}
+
+.modal-triggers {
+    z-index: 100;
+    width: 80%;
+    height: 60%;
+    position: absolute;
+    left: 10%;
+    top: 10%;
     padding: 15px;
     background-color: rgb(33, 33, 33);
 }
@@ -115,13 +139,15 @@ pre {
 }
 
 .body-base {
-    background-color: #19222b;
+    overflow: scroll;
+    background-color: #0d1215;
     color: #dee2e6;
+    background-color: #181a1c;
 }
 
 .alx-messages {
     margin: auto;
-    font-family: monospace;
+    /*font-family: Verdana, Geneva, Tahoma, sans-serif*/
 }
 
 .title-x {

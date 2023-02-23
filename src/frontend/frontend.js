@@ -133,16 +133,18 @@ document.addEventListener('alpine:init', () => {
     Alpine.store('log', {
         servers: [],
         channels: [],
-        messages: []
+        messages: [],
+        trigger_messages: [],
+        triggers: []
     })
 
     //Need to refactor into class document id value calls
     Alpine.store('controls', {
-        datetime1: new Date().toISOString().split('.')[0],
-        datetime2: new Date().toISOString().split('.')[0],
+        datetime1: new Date().toISOString().substring(0, 19),
+        datetime2: new Date().toISOString().substring(0, 19),
         metrics: ['cpu', 'mem_used', 'disk_used', 'io_read', 'io_write', 'net_in', 'net_out', 'error_rate'],
-        showModal: true,
-        showServerMetrics: false,
+        showAuthModal: true,
+        showPage: 0,
         autoUpdate: false,
         autoUpdateSpeed: 3000,
         serverFilter: [],

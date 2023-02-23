@@ -33,11 +33,11 @@ export default class FrontEndcontroller extends HasApp {
         this.bind('post', '/servers', this.getServers);
         this.bind('post', '/channels', this.getChannels);
 
-        ['app.html',
-            'favicon.ico',
+        ['favicon.ico',
             'style.css',
             'translation.js',
-            'frontend.js'].forEach((element) => {
+            'frontend.js',
+            'app.html'].forEach((element) => {
                 this.serveFile(element);
             });
 
