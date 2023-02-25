@@ -1,4 +1,6 @@
-
+"use strict";
+var Alpine;
+var Chart;
 let basicPost = () => {
     return {
         method: 'POST',
@@ -7,175 +9,190 @@ let basicPost = () => {
             'auth-token': Alpine.store('credentials').password
         }
     };
-}
-
+};
 async function authenticate() {
     let response = await fetch('/auth', basicPost());
     Alpine.store('credentials').authenticated = await response.text() === 'Authenticated' ? 2 : 1;
 }
-
 async function updateServerList() {
     let response = await fetch('/servers', basicPost());
     let json = await response.json();
     Alpine.store('log').servers = json;
 }
-
+async function updateTriggerList() {
+    let response = await fetch('/triggers', basicPost());
+    let json = await response.json();
+    Alpine.store('log').triggers = json;
+}
+async function getTriggerMessages() {
+    let data = basicPost();
+    data.body = JSON.stringify({
+        intervalStart: Math.min(getTimestamps(0), getTimestamps(1)),
+        intervalEnd: Math.max(getTimestamps(0), getTimestamps(1)),
+        pageSize: Alpine.store('controls').pageSize,
+        page: Alpine.store('controls').pageTriggerMessages
+    });
+    let response = await fetch('/trigger_messages', data);
+    let json = await response.json();
+    Alpine.store('log').trigger_messages = json.data;
+}
 async function updateChannelList() {
     let response = await fetch('/channels', basicPost());
     let json = await response.json();
     Alpine.store('log').channels = json;
 }
-
 function getTimestamps(fieldIndex) {
-
     let timeframe = Alpine.store('controls').timeframeType == 'since';
-
+    let field;
     if (fieldIndex == 0) {
-        if (timeframe) return Date.now() - Alpine.store('controls').timeSelect;
+        if (timeframe)
+            return Date.now() - Alpine.store('controls').timeSelect;
         field = Alpine.store('controls').datetime1;
-    } else {
-        if (timeframe) return Date.now();
+    }
+    else {
+        if (timeframe)
+            return Date.now();
         field = Alpine.store('controls').datetime2;
     }
-
     return new Date(field).getTime();
 }
-
 let metricsCompiled = {};
+let metricsCompiledLabels = {};
 async function updateMetrics() {
+    var _a, _b, _c, _d;
+    var _e, _f, _g, _h;
     try {
         let data = basicPost();
         let resolution = 15;
-
         data.body = JSON.stringify({
             intervalStart: Math.min(getTimestamps(0), getTimestamps(1)),
             intervalEnd: Math.max(getTimestamps(0), getTimestamps(1)),
             resolution
         });
-
         let response = await fetch('/metrics', data);
         let json = await response.json();
-
         let intervalStart = json.intervalStart;
         let intervalEnd = json.intervalEnd;
         resolution = json.resolution;
         let timePerSlice = (intervalEnd - intervalStart) / resolution;
-
         if (Array.isArray(json.data)) {
             metricsCompiled = {};
             metricsCompiledLabels = {};
             for (let metricEntry of json.data) {
-                metricsCompiled[metricEntry.server] ??= {};
-                metricsCompiledLabels[metricEntry.server] ??= {};
+                (_a = metricsCompiled[_e = metricEntry.server]) !== null && _a !== void 0 ? _a : (metricsCompiled[_e] = {});
+                (_b = metricsCompiledLabels[_f = metricEntry.server]) !== null && _b !== void 0 ? _b : (metricsCompiledLabels[_f] = {});
                 for (let metricKey of Alpine.store('controls').metrics) {
-                    metricsCompiled[metricEntry.server][metricKey] ??= [];
-                    metricsCompiledLabels[metricEntry.server][metricKey] ??= [];
+                    (_c = (_g = metricsCompiled[metricEntry.server])[metricKey]) !== null && _c !== void 0 ? _c : (_g[metricKey] = []);
+                    (_d = (_h = metricsCompiledLabels[metricEntry.server])[metricKey]) !== null && _d !== void 0 ? _d : (_h[metricKey] = []);
                     metricsCompiled[metricEntry.server][metricKey][metricEntry.slice] = metricEntry[metricKey];
                     let time = new Date(intervalStart + metricEntry.slice * timePerSlice).toISOString().split('.')[0].replace('T', ' ');
                     metricsCompiledLabels[metricEntry.server][metricKey].push(time);
                 }
-            };
+            }
+            ;
         }
-    } catch (err) {
+    }
+    catch (err) {
         console.log(err);
     }
 }
-
 let updatingMetadata = false;
 setInterval(async () => {
-    if (typeof Alpine === 'undefined' || updatingMetadata) return;
-
+    if (typeof Alpine === 'undefined' || Alpine === undefined || updatingMetadata)
+        return;
     if (Alpine.store('credentials').authenticated === 2) {
         try {
             updatingMetadata = true;
             await updateServerList();
             await updateChannelList();
-        } catch (err) {
+        }
+        catch (err) {
             console.log(err);
-        } finally {
+        }
+        finally {
             updatingMetadata = false;
         }
     }
 }, 2000);
-
-
 let updatingMetrics = false;
 setInterval(async () => {
-    if (typeof Alpine === 'undefined' || updatingMetrics) return;
-
+    if (typeof Alpine === 'undefined' || updatingMetrics)
+        return;
     if (Alpine.store('credentials').authenticated === 2) {
         try {
             updatingMetrics = true;
             await updateMetrics();
             await syncCharts();
-        } catch (err) {
+        }
+        catch (err) {
             console.log(err);
-        } finally {
+        }
+        finally {
             updatingMetrics = false;
         }
     }
 }, 5000);
-
 let lastAutoUpdate = 0;
-setInterval(async () => {
-    if (typeof Alpine === 'undefined') return;
-
+async function searchLogs(force = false) {
+    if (typeof Alpine === 'undefined')
+        return;
     let now = Date.now();
-
-    if (Alpine.store('controls').autoUpdate && ((now - parseInt(Alpine.store('controls').autoUpdateSpeed)) > lastAutoUpdate)) {
-        search(Alpine.store('controls').searchTerm, 0, 10, Alpine.store('controls').page, Alpine.store('controls').pageSize);
+    if (force || Alpine.store('controls').autoUpdate && ((now - parseInt(Alpine.store('controls').autoUpdateSpeed)) > lastAutoUpdate)) {
+        await search(Alpine.store('controls').searchTerm, 0, 10, Alpine.store('controls').pageLogs, Alpine.store('controls').pageSize);
         lastAutoUpdate = now;
     }
-}, 333)
-
+}
+const _global = (window || global);
+setInterval(async () => { searchLogs(false); }, 333);
 document.addEventListener('alpine:init', () => {
-
     Alpine.store('log', {
         servers: [],
         channels: [],
         messages: [],
         trigger_messages: [],
         triggers: []
-    })
-
-    //Need to refactor into class document id value calls
+    });
     Alpine.store('controls', {
         datetime1: new Date().toISOString().substring(0, 19),
         datetime2: new Date().toISOString().substring(0, 19),
         metrics: ['cpu', 'mem_used', 'disk_used', 'io_read', 'io_write', 'net_in', 'net_out', 'error_rate'],
         showAuthModal: true,
+        showTriggerModal: true,
+        trigger_edit_id: 0,
+        trigger_edit_name: '',
+        trigger_edit_description: '',
+        trigger_edit_type: '',
+        trigger_edit_value: '',
+        trigger_edit_threshold: 0,
+        trigger_edit_time: 0,
         showPage: 0,
         autoUpdate: false,
         autoUpdateSpeed: 3000,
         serverFilter: [],
         channelFilter: [],
         timeframeType: 'since',
-        timeSelect: 2000000000000,
-        page: 0,
-        pageSize: 50,
+        timeSelect: Date.now(),
+        pageLogs: 0,
+        pageTriggerMessages: 0,
+        pageSize: 30,
         lastPage: 0,
         minimumLevel: 1,
         maximumLevel: 10,
         searchTerm: '',
-    })
-
+    });
     Alpine.store('credentials', {
         password: '',
         authenticated: 0
-    })
-
-    //it is used in the app view
-    this.translate = initializeTranslation(Alpine);
+    });
+    _global.trans = initializeTranslation(Alpine);
 });
-
 let searchActive = false;
 async function search(searchTerm, minimumLevel, maximumLevel, page, pageSize) {
-    if (searchActive) return;
-
+    if (searchActive)
+        return;
     try {
         searchActive = true;
         let data = basicPost();
-
         data.body = JSON.stringify({
             searchTerm,
             intervalStart: Math.min(getTimestamps(0), getTimestamps(1)),
@@ -187,41 +204,36 @@ async function search(searchTerm, minimumLevel, maximumLevel, page, pageSize) {
             servers: Object.values(Alpine.store('controls').serverFilter),
             channels: Object.values(Alpine.store('controls').channelFilter)
         });
-
         let response = await fetch('/search', data);
         let json = await response.json();
-
         Alpine.store('log').messages = json.data;
-        Alpine.store('controls').pageSize = json.pageSize;
-        Alpine.store('controls').lastPage = Math.ceil(json.entryCount / json.pageSize);
-    } catch (err) {
+        Alpine.store('controls').lastPage = Math.ceil(json.entryCount / Alpine.store('controls').pageSize);
+    }
+    catch (err) {
         console.log(err);
-    } finally {
+    }
+    finally {
         searchActive = false;
     }
 }
-
 let charts = {};
 async function syncCharts() {
     try {
         let servers = Object.keys(metricsCompiled);
-
         for (let server of servers) {
             for (let metric of Object.keys(metricsCompiled[server])) {
                 let element = document.getElementById(server + ':' + metric);
-                let chartName = server + ' - ' + translate('metrics_' + metric);
+                let chartName = server + ' - ' + _global.trans('metrics_' + metric);
                 if (element)
                     makeOrUpdateChart(metricsCompiled[server][metric], chartName, metricsCompiledLabels[server][metric], element);
             }
         }
-
         await new Promise(resolve => setTimeout(resolve, 10));
-
-    } catch (err) {
+    }
+    catch (err) {
         console.log(err);
     }
 }
-
 let chartScaleLayout = {
     ticks: {
         color: "white"
@@ -230,23 +242,21 @@ let chartScaleLayout = {
         color: '#888'
     }
 };
-
 function makeOrUpdateChart(chartData, chartName, chartLabels, element) {
-
     if (charts[chartName] == undefined) {
         let context = element.getContext('2d');
-        let myChart = new Chart(context, {
+        let chart = new Chart(context, {
             type: 'line',
             data: {
                 labels: chartLabels,
                 datasets: [{
-                    label: chartName,
-                    data: chartData,
-                    fill: true,
-                    backgroundColor: '#07429b',
-                    borderColor: '#247bff',
-                    tension: 0.1
-                }]
+                        label: chartName,
+                        data: chartData,
+                        fill: true,
+                        backgroundColor: '#07429b',
+                        borderColor: '#247bff',
+                        tension: 0.1
+                    }]
             },
             options: {
                 responsive: true,
@@ -264,35 +274,35 @@ function makeOrUpdateChart(chartData, chartName, chartLabels, element) {
                 }
             }
         });
-        charts[chartName] = myChart;
-    } else {
+        charts[chartName] = chart;
+    }
+    else {
         charts[chartName].data.datasets[0].data = chartData;
         charts[chartName].data.labels = chartLabels;
         charts[chartName].update();
     }
 }
-
 function prettifyJson(json) {
-    //Remove critical characters
     json = json
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
-
     return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
         let type = 'alx-number';
         if (/^"/.test(match)) {
             if (/:$/.test(match)) {
                 type = 'alx-key';
-            } else {
+            }
+            else {
                 type = 'alx-string';
             }
-        } else if (/true|false/.test(match)) {
+        }
+        else if (/true|false/.test(match)) {
             type = 'alx-boolean';
-        } else if (/null/.test(match)) {
+        }
+        else if (/null/.test(match)) {
             type = 'alx-null';
         }
-
         return '<span class="' + type + '">' + match + '</span>';
     });
 }

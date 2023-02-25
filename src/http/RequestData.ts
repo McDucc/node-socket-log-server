@@ -1,5 +1,3 @@
-import { env } from "./env";
-
 /**
  * Wraps the data of the original request since it does not exist past the initial uws handler
  */

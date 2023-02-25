@@ -53,8 +53,9 @@ async function c(pool) {
             CREATE TABLE ${env_1.env.postgres.trigger_messages_table} (
                 id BIGSERIAL PRIMARY KEY,
                 trigger_id BIGINT,
+                server VARCHAR(${env_1.env.postgres.column_server_size}),
                 value REAL,
-                time BIGINT); `);
+                time BIGINT);`);
             console.log(`[${new Date().toISOString()}] Created trigger messages table as ${env_1.env.postgres.trigger_messages_table}`);
             await client.queryString(`
             CREATE FUNCTION logs_search_tsvector_update() RETURNS trigger AS $$

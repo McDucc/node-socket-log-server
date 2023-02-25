@@ -1,10 +1,10 @@
-import HasApp from './HasApp';
-import { env } from './env';
+import HasApp from '../http/HasApp';
+import { Environment } from './Environment';
 import { DEDICATED_COMPRESSOR_16KB } from 'uWebSockets.js';
 import { URLSearchParams } from 'url';
 import Postgres from 'postgres';
-import SetupPostgresPool from './PostgresSetup';
-import TableSetup from './TableSetup';
+import SetupPostgresPool from '../database/PostgresSetup';
+import TableSetup from '../database/TableSetup';
 
 
 export default class LoggerWebservice extends HasApp {
@@ -12,15 +12,15 @@ export default class LoggerWebservice extends HasApp {
     postgresPool: Postgres;
 
     writeLogQueryName = 'write-log';
-    writeLogQueryText = `INSERT INTO ${env.postgres.logs_table} (level,time,channel,message,server,data) VALUES ($1,$2,$3,$4,$5,$6)`
+    writeLogQueryText = `INSERT INTO ${Environment.postgres.logs_table} (level,time,channel,message,server,data) VALUES ($1,$2,$3,$4,$5,$6)`
 
     writeMetricsQueryName = 'write-metric';
-    writeMetricsQueryText = `INSERT INTO ${env.postgres.metrics_table} 
+    writeMetricsQueryText = `INSERT INTO ${Environment.postgres.metrics_table} 
            (time,server,cpu,mem_used,io_read,io_write,disk_used,net_in,net_out)
     VALUES ($1  ,$2    ,$3 ,$4      ,$5     ,$6      ,$7       ,$8    ,$9)`
     constructor() {
 
-        super(env.logger_port);
+        super(Environment.logger_port);
 
         this.postgresPool = SetupPostgresPool();
 
@@ -36,7 +36,7 @@ export default class LoggerWebservice extends HasApp {
 
                 let parameters = new URLSearchParams(req.getQuery());
 
-                if (!parameters.get('name') || !parameters.get('auth') || parameters.get('auth') != env.logger_password)
+                if (!parameters.get('name') || !parameters.get('auth') || parameters.get('auth') != Environment.logger_password)
                     return res.end('Unauthorized or name / auth missing.');
 
                 let name = parameters.get('name');

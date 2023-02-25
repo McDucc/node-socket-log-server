@@ -95,20 +95,24 @@ pre {
     }
 }
 
+input:invalid {
+    border: solid red 3px;
+}
+
 .bd-example+p {
     margin-top: 2rem
 }
 
-.btn-10 {
-    width: 15%;
-    min-width: 150px;
-    text-align: center;
+.btn-selected {
+    background-color: #414549;
+    color: #dee2e6;
 }
 
 .modalx {
     z-index: 100;
     width: 400px;
-    height: 200px;
+    display: block;
+    overflow: auto;
     position: absolute;
     left: 50%;
     top: 200;

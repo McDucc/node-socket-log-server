@@ -1,6 +1,6 @@
-import FrontEndcontroller from './FrontendService';
-import LoggerWebservice from './LoggerWebservice';
-import cluster, {Worker} from 'cluster';
+import FrontEndcontroller from './services/FrontendService';
+import LoggerWebservice from './services/LogService';
+import cluster, { Worker } from 'cluster';
 
 /**
  * We use the cluster module to create one worker for the webservice and one for the frontend

@@ -1,5 +1,8 @@
+var Alpine: any;
+var Chart: any;
+const _global = (window || global) as any
 
-let basicPost = () => {
+let basicPost: any = () => {
     return {
         method: 'POST',
         cache: 'no-cache',
@@ -20,16 +23,37 @@ async function updateServerList() {
     Alpine.store('log').servers = json;
 }
 
+async function updateTriggerList() {
+    let response = await fetch('/triggers', basicPost());
+    let json = await response.json();
+    Alpine.store('log').triggers = json;
+}
+
+async function getTriggerMessages() {
+    let data = basicPost();
+    data.body = JSON.stringify({
+        intervalStart: Math.min(getTimestamps(0), getTimestamps(1)),
+        intervalEnd: Math.max(getTimestamps(0), getTimestamps(1)),
+        pageSize: Alpine.store('controls').pageSize,
+        page: Alpine.store('controls').pageTriggerMessages
+    });
+
+    let response = await fetch('/trigger_messages', data);
+    let json = await response.json();
+    Alpine.store('log').trigger_messages = json.data;
+}
+
+
 async function updateChannelList() {
     let response = await fetch('/channels', basicPost());
     let json = await response.json();
     Alpine.store('log').channels = json;
 }
 
-function getTimestamps(fieldIndex) {
+function getTimestamps(fieldIndex: number) {
 
     let timeframe = Alpine.store('controls').timeframeType == 'since';
-
+    let field: string;
     if (fieldIndex == 0) {
         if (timeframe) return Date.now() - Alpine.store('controls').timeSelect;
         field = Alpine.store('controls').datetime1;
@@ -41,7 +65,8 @@ function getTimestamps(fieldIndex) {
     return new Date(field).getTime();
 }
 
-let metricsCompiled = {};
+let metricsCompiled: Dictionary<any> = {};
+let metricsCompiledLabels: Dictionary<any> = {};
 async function updateMetrics() {
     try {
         let data = basicPost();
@@ -83,7 +108,7 @@ async function updateMetrics() {
 
 let updatingMetadata = false;
 setInterval(async () => {
-    if (typeof Alpine === 'undefined' || updatingMetadata) return;
+    if (typeof Alpine === 'undefined' || Alpine === undefined || updatingMetadata) return;
 
     if (Alpine.store('credentials').authenticated === 2) {
         try {
@@ -117,16 +142,18 @@ setInterval(async () => {
 }, 5000);
 
 let lastAutoUpdate = 0;
-setInterval(async () => {
+async function searchLogs(force: boolean = false) {
     if (typeof Alpine === 'undefined') return;
 
     let now = Date.now();
 
-    if (Alpine.store('controls').autoUpdate && ((now - parseInt(Alpine.store('controls').autoUpdateSpeed)) > lastAutoUpdate)) {
-        search(Alpine.store('controls').searchTerm, 0, 10, Alpine.store('controls').page, Alpine.store('controls').pageSize);
+    if (force || Alpine.store('controls').autoUpdate && ((now - parseInt(Alpine.store('controls').autoUpdateSpeed)) > lastAutoUpdate)) {
+        await search(Alpine.store('controls').searchTerm, 0, 10, Alpine.store('controls').pageLogs, Alpine.store('controls').pageSize);
         lastAutoUpdate = now;
     }
-}, 333)
+}
+
+setInterval(async () => { searchLogs(false); }, 333)
 
 document.addEventListener('alpine:init', () => {
 
@@ -138,21 +165,29 @@ document.addEventListener('alpine:init', () => {
         triggers: []
     })
 
-    //Need to refactor into class document id value calls
     Alpine.store('controls', {
         datetime1: new Date().toISOString().substring(0, 19),
         datetime2: new Date().toISOString().substring(0, 19),
         metrics: ['cpu', 'mem_used', 'disk_used', 'io_read', 'io_write', 'net_in', 'net_out', 'error_rate'],
         showAuthModal: true,
+        showTriggerModal: true,
+        trigger_edit_id: 0,
+        trigger_edit_name: '',
+        trigger_edit_description: '',
+        trigger_edit_type: '',
+        trigger_edit_value: '',
+        trigger_edit_threshold: 0,
+        trigger_edit_time: 0,
         showPage: 0,
         autoUpdate: false,
         autoUpdateSpeed: 3000,
         serverFilter: [],
         channelFilter: [],
         timeframeType: 'since',
-        timeSelect: 2000000000000,
-        page: 0,
-        pageSize: 50,
+        timeSelect: Date.now(),
+        pageLogs: 0,
+        pageTriggerMessages: 0,
+        pageSize: 30,
         lastPage: 0,
         minimumLevel: 1,
         maximumLevel: 10,
@@ -162,14 +197,15 @@ document.addEventListener('alpine:init', () => {
     Alpine.store('credentials', {
         password: '',
         authenticated: 0
-    })
+    });
 
-    //it is used in the app view
-    this.translate = initializeTranslation(Alpine);
+    _global.trans = initializeTranslation(Alpine);
+
 });
 
+
 let searchActive = false;
-async function search(searchTerm, minimumLevel, maximumLevel, page, pageSize) {
+async function search(searchTerm: string, minimumLevel: number, maximumLevel: number, page: number, pageSize: number) {
     if (searchActive) return;
 
     try {
@@ -192,8 +228,7 @@ async function search(searchTerm, minimumLevel, maximumLevel, page, pageSize) {
         let json = await response.json();
 
         Alpine.store('log').messages = json.data;
-        Alpine.store('controls').pageSize = json.pageSize;
-        Alpine.store('controls').lastPage = Math.ceil(json.entryCount / json.pageSize);
+        Alpine.store('controls').lastPage = Math.ceil(json.entryCount / Alpine.store('controls').pageSize);
     } catch (err) {
         console.log(err);
     } finally {
@@ -201,15 +236,15 @@ async function search(searchTerm, minimumLevel, maximumLevel, page, pageSize) {
     }
 }
 
-let charts = {};
+let charts: Dictionary<any> = {};
 async function syncCharts() {
     try {
         let servers = Object.keys(metricsCompiled);
 
         for (let server of servers) {
             for (let metric of Object.keys(metricsCompiled[server])) {
-                let element = document.getElementById(server + ':' + metric);
-                let chartName = server + ' - ' + translate('metrics_' + metric);
+                let element = <HTMLCanvasElement>document.getElementById(server + ':' + metric);
+                let chartName = server + ' - ' + _global.trans('metrics_' + metric);
                 if (element)
                     makeOrUpdateChart(metricsCompiled[server][metric], chartName, metricsCompiledLabels[server][metric], element);
             }
@@ -231,11 +266,11 @@ let chartScaleLayout = {
     }
 };
 
-function makeOrUpdateChart(chartData, chartName, chartLabels, element) {
+function makeOrUpdateChart(chartData: number[], chartName: string, chartLabels: string[], element: HTMLCanvasElement) {
 
     if (charts[chartName] == undefined) {
         let context = element.getContext('2d');
-        let myChart = new Chart(context, {
+        let chart = new Chart(context, {
             type: 'line',
             data: {
                 labels: chartLabels,
@@ -264,7 +299,7 @@ function makeOrUpdateChart(chartData, chartName, chartLabels, element) {
                 }
             }
         });
-        charts[chartName] = myChart;
+        charts[chartName] = chart;
     } else {
         charts[chartName].data.datasets[0].data = chartData;
         charts[chartName].data.labels = chartLabels;
@@ -272,7 +307,7 @@ function makeOrUpdateChart(chartData, chartName, chartLabels, element) {
     }
 }
 
-function prettifyJson(json) {
+function prettifyJson(json: string) {
     //Remove critical characters
     json = json
         .replace(/&/g, '&amp;')
@@ -296,3 +331,5 @@ function prettifyJson(json) {
         return '<span class="' + type + '">' + match + '</span>';
     });
 }
+
+type Dictionary<T> = { [key: string]: T }
