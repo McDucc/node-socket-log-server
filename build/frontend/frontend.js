@@ -1,6 +1,7 @@
 "use strict";
 var Alpine;
 var Chart;
+const _global = (window || global);
 let basicPost = () => {
     return {
         method: 'POST',
@@ -142,7 +143,6 @@ async function searchLogs(force = false) {
         lastAutoUpdate = now;
     }
 }
-const _global = (window || global);
 setInterval(async () => { searchLogs(false); }, 333);
 document.addEventListener('alpine:init', () => {
     Alpine.store('log', {

@@ -19,7 +19,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.env = void 0;
+exports.Environment = void 0;
 const fs = __importStar(require("fs"));
-exports.env = JSON.parse(fs.readFileSync('env.json').toString());
+exports.Environment = JSON.parse(fs.readFileSync('env.json').toString());
 console.log(`[${new Date().toISOString()}] Environment file read`);

@@ -43,7 +43,7 @@ function initializeTranslation(Alpine) {
             metrics_error_rate: 'Error Rate',
             incoming_logs: 'Incoming Log Messages',
             triggers_add: 'Add',
-            triggers_add_title: 'Edit Trigger',
+            triggers_add_title: 'Add Trigger',
             triggers_edit: 'Edit',
             triggers_edit_title: 'Edit Trigger',
             triggers_delete: 'Delete',
@@ -54,7 +54,12 @@ function initializeTranslation(Alpine) {
             triggers_value: 'Value',
             triggers_threshold: 'Threshold',
             triggers_time: 'Timeframe (Seconds)',
-            triggers_delete_question: 'Are you sure you want to delete the trigger with the ID ',
+            triggers_delete_question: 'Are you sure you want to delete the trigger with the ID %s ?',
+            triggers_type_gt: 'Greater',
+            triggers_type_gteq: 'Greater or equal',
+            triggers_type_eq: 'Equal',
+            triggers_type_lteq: 'Lower or equal',
+            triggers_type_lt: 'Lower',
         },
     });
     return (index) => {

@@ -22,12 +22,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const RequestData_1 = __importDefault(require("./RequestData"));
-const HasApp_1 = __importDefault(require("./HasApp"));
+const RequestData_1 = __importDefault(require("../http/RequestData"));
+const HasApp_1 = __importDefault(require("../http/HasApp"));
 const fs = __importStar(require("fs"));
-const env_1 = require("./env");
+const Environment_1 = require("./Environment");
 const path_1 = __importDefault(require("path"));
-const PostgresSetup_1 = __importDefault(require("./PostgresSetup"));
+const PostgresSetup_1 = __importDefault(require("../database/PostgresSetup"));
 const zlib_1 = require("zlib");
 function EndReponse(response, data, closeConnection = false) {
     if (!response.ended) {
@@ -36,11 +36,11 @@ function EndReponse(response, data, closeConnection = false) {
 }
 class FrontEndcontroller extends HasApp_1.default {
     constructor() {
-        super(env_1.env.frontend_port);
-        this.searchLockLimit = env_1.env.search_limit;
+        super(Environment_1.Environment.frontend_port);
+        this.searchLockLimit = Environment_1.Environment.search_limit;
         this.searchLock = 0;
         this.searchQuery1Name = 'search-query-1';
-        this.searchQuery1 = `SELECT level,server,time,message,data FROM ${env_1.env.postgres.logs_table} WHERE 
+        this.searchQuery1 = `SELECT level,server,time,message,data FROM ${Environment_1.Environment.postgres.logs_table} WHERE 
     search @@ plainto_tsquery($1)
     AND channel = ANY($2)
     AND level BETWEEN $3 AND $4
@@ -48,21 +48,21 @@ class FrontEndcontroller extends HasApp_1.default {
     AND time BETWEEN $6 AND $7
     OFFSET $8 LIMIT $9`;
         this.searchQuery1CountName = 'search-query-1-count';
-        this.searchQuery1Count = `SELECT COUNT(*) as count FROM ${env_1.env.postgres.logs_table} WHERE 
+        this.searchQuery1Count = `SELECT COUNT(*) as count FROM ${Environment_1.Environment.postgres.logs_table} WHERE 
     search @@ plainto_tsquery($1)
     AND channel = ANY($2)
     AND level BETWEEN $3 AND $4
     AND server = ANY($5)
     AND time BETWEEN $6 AND $7`;
         this.searchQuery2Name = 'search-query-2';
-        this.searchQuery2 = `SELECT channel,level,server,time,message,data FROM ${env_1.env.postgres.logs_table} WHERE 
+        this.searchQuery2 = `SELECT channel,level,server,time,message,data FROM ${Environment_1.Environment.postgres.logs_table} WHERE 
     channel = ANY($1)
     AND level BETWEEN $2 AND $3
     AND server = ANY($4)
     AND time BETWEEN $5 AND $6
     OFFSET $7 LIMIT $8`;
         this.searchQuery2CountName = 'search-query-2-count';
-        this.searchQuery2Count = `SELECT COUNT(*) as count FROM ${env_1.env.postgres.logs_table} WHERE 
+        this.searchQuery2Count = `SELECT COUNT(*) as count FROM ${Environment_1.Environment.postgres.logs_table} WHERE 
     channel = ANY($1)
     AND level BETWEEN $2 AND $3
     AND server = ANY($4)
@@ -78,7 +78,7 @@ class FrontEndcontroller extends HasApp_1.default {
     ROUND(AVG(net_in)::numeric,3) AS net_in,
     ROUND(AVG(net_out)::numeric,3) AS net_out,
     0 AS error_rate,
-    FLOOR((time - $1 + 0.00001) / ($2::numeric - $1) * $3) as slice FROM ${env_1.env.postgres.metrics_table} WHERE
+    FLOOR((time - $1 + 0.00001) / ($2::numeric - $1) * $3) as slice FROM ${Environment_1.Environment.postgres.metrics_table} WHERE
     time BETWEEN $1 AND $2
     GROUP BY slice, server
     ORDER BY slice`;
@@ -117,7 +117,7 @@ class FrontEndcontroller extends HasApp_1.default {
             request.forEach((headerKey, headerValue) => {
                 headers[headerKey] = headerValue;
             });
-            if (auth && headers['auth-token'] !== env_1.env.logger_password) {
+            if (auth && headers['auth-token'] !== Environment_1.Environment.logger_password) {
                 return EndReponse(response, 'Unauthenticated');
             }
             let body = Buffer.from('');
@@ -130,7 +130,7 @@ class FrontEndcontroller extends HasApp_1.default {
         });
     }
     async serveFile(file) {
-        let filePath = path_1.default.resolve(__dirname, './frontend/' + file);
+        let filePath = path_1.default.resolve(__dirname, './../frontend/' + file);
         if (!fs.existsSync(filePath))
             console.log(new Error(filePath + ' does not exist and can not be bound to router!'));
         this.bind('get', '/' + file, (_request, response) => {
@@ -262,7 +262,7 @@ class FrontEndcontroller extends HasApp_1.default {
     }
     async metricsLookup(minimumTime, maximumTime, resolution = 30) {
         let data = await this.postgresPool.query(this.metricsQueryName, this.metricsQuery, [minimumTime, maximumTime, resolution]);
-        let errorRate = await this.postgresPool.query(this.errorRateQueryName, this.errorRateQuery, [minimumTime, maximumTime, resolution, env_1.env.error_rate_level]);
+        let errorRate = await this.postgresPool.query(this.errorRateQueryName, this.errorRateQuery, [minimumTime, maximumTime, resolution, Environment_1.Environment.error_rate_level]);
         data.forEach(dataElement => {
             errorRate.forEach(errorRateElement => {
                 if (dataElement.slice == errorRateElement.slice && dataElement.server == errorRateElement.server) {

@@ -76,7 +76,7 @@ export default class FrontEndcontroller extends HasApp {
     }
 
     async serveFile(file: string) {
-        let filePath = path.resolve(__dirname, './frontend/' + file);
+        let filePath = path.resolve(__dirname, './../frontend/' + file);
 
         if (!fs.existsSync(filePath))
             console.log(new Error(filePath + ' does not exist and can not be bound to router!'));

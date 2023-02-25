@@ -37,11 +37,15 @@
         <input class="form-control" type="text" x-model="$store.controls.trigger_edit_name">
 
         <label class="mt-2 mb-1" x-text="trans('triggers_description')"></label>
-        <input class="form-control" type="textarea" x-model="$store.controls.trigger_edit_description">
+        <input class="form-control" type="text" x-model="$store.controls.trigger_edit_description">
 
         <label class="mt-2 mb-1" x-text="trans('triggers_type')"></label>
         <select class="form-control" type="text" x-model="$store.controls.trigger_edit_type">
-            <option></option>
+            <option value="gt" x-text="trans('triggers_type_gt')"></option>
+            <option value="gteq" x-text="trans('triggers_type_gteq')"></option>
+            <option value="eq" x-text="trans('triggers_type_eq')"></option>
+            <option value="lteq" x-text="trans('triggers_type_lteq')"></option>
+            <option value="lt" x-text="trans('triggers_type_lt')"></option>
         </select>
 
         <label class="mt-2 mb-1" x-text="trans('triggers_value')"></label>

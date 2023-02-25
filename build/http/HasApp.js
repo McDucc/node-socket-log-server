@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const uWebSockets_js_1 = require("uWebSockets.js");
-const env_1 = require("./env");
+const Environment_1 = require("../services/Environment");
 class HasApp {
     constructor(port) {
         this.port = port;
@@ -9,10 +9,10 @@ class HasApp {
             console.log(err);
             process.exit(1);
         });
-        if (env_1.env.ssl) {
+        if (Environment_1.Environment.ssl) {
             this.app = (0, uWebSockets_js_1.SSLApp)({
-                cert_file_name: env_1.env.ssl_cert,
-                key_file_name: env_1.env.ssl_key
+                cert_file_name: Environment_1.Environment.ssl_cert,
+                key_file_name: Environment_1.Environment.ssl_key
             });
         }
         else {
@@ -20,12 +20,12 @@ class HasApp {
         }
     }
     startListening() {
-        this.app.listen(env_1.env.host, this.port, (listenSocket) => {
+        this.app.listen(Environment_1.Environment.host, this.port, (listenSocket) => {
             if (listenSocket) {
-                console.log(`${this.constructor.name} is listening on ${env_1.env.host}:${this.port}`);
+                console.log(`${this.constructor.name} is listening on ${Environment_1.Environment.host}:${this.port}`);
             }
             else {
-                console.log(`${this.constructor.name} could not start listening on ${env_1.env.host}:${this.port}`);
+                console.log(`${this.constructor.name} could not start listening on ${Environment_1.Environment.host}:${this.port}`);
             }
         });
     }
