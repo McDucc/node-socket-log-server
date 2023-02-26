@@ -34,6 +34,9 @@ export default class FrontEndcontroller extends HasApp {
         this.bind('post', '/triggers', this.getTriggers);
         this.bind('post', '/trigger_messages', this.getTriggerMessages);
         this.bind('post', '/channels', this.getChannels);
+        this.bind('post', '/triggers/create', this.createTrigger);
+        this.bind('post', '/triggers/update', this.updateTrigger);
+        this.bind('post', '/triggers/delete', this.deleteTrigger);
 
         ['favicon.ico',
             'style.css',
@@ -115,10 +118,6 @@ export default class FrontEndcontroller extends HasApp {
 
     async getTriggers(request: RequestData, response: HttpResponse) {
         let data = await this.postgresPool.query("get-triggers", "SELECT * from triggers ORDER BY active DESC", []);
-        let dataArray: any = [];
-        for (let trigger of data) {
-            dataArray[trigger.id] = trigger;
-        }
         EndReponse(response, JSON.stringify(data));
     }
 
@@ -228,6 +227,26 @@ export default class FrontEndcontroller extends HasApp {
             response.writeHeader('Content-Encoding', 'gzip');
             EndReponse(response, gzipSync(JSON.stringify(data), { level: 9, memLevel: 9 }));
         }
+    }
+
+    async createTrigger(request: RequestData, response: HttpResponse) {
+        let data = JSON.parse(request.data);
+        let id = await this.postgresPool.query('create-trigger', 'INSERT INTO triggers (name,description,type,value,active,threshold,time) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
+            [data.name, data.description, data.type, data.value, true, data.threshold, data.time]);
+        EndReponse(response, id[0]);
+    }
+
+    async updateTrigger(request: RequestData, response: HttpResponse) {
+        let data = JSON.parse(request.data);
+        let id = await this.postgresPool.query('update-trigger', 'UPDATE triggers SET name=$1,description=$2,type=$3,value=$4,active=$5,threshold=$6,time=$7 WHERE id=$8',
+            [data.name, data.description, data.type, data.value, data.active, data.threshold, data.time, data.id]);
+        EndReponse(response, id[0]);
+    }
+
+    async deleteTrigger(request: RequestData, response: HttpResponse) {
+        let data = JSON.parse(request.data);
+        await this.postgresPool.query('delete-trigger', 'DELETE FROM triggers WHERE id = $1', [data.id]);
+        EndReponse(response, 'OK');
     }
 
     async metricsSearch(parametersRaw: any, response: HttpResponse) {

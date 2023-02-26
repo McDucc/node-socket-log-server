@@ -1,7 +1,7 @@
 "use strict";
-function initializeTranslation(Alpine) {
+function initializeTranslation(Alpine, currentLanguage = 'en') {
     Alpine.store('lang', {
-        current: 'en',
+        current: currentLanguage,
         en: {
             page_logging: 'Logging',
             page_metrics: 'Metrics',
@@ -41,7 +41,8 @@ function initializeTranslation(Alpine) {
             metrics_net_in: 'Traffic In MB',
             metrics_net_out: 'Traffic Out MB',
             metrics_error_rate: 'Error Rate',
-            incoming_logs: 'Incoming Log Messages',
+            metrics_logs: 'Incoming Log Messages',
+            triggers_id: 'ID',
             triggers_add: 'Add',
             triggers_add_title: 'Add Trigger',
             triggers_edit: 'Edit',
@@ -63,7 +64,6 @@ function initializeTranslation(Alpine) {
         },
     });
     return (index) => {
-        var _a;
-        return (_a = Alpine.store('lang')[Alpine.store('lang').current][index]) !== null && _a !== void 0 ? _a : index;
+        return Alpine.store('lang')[Alpine.store('lang').current][index] ?? index;
     };
 }

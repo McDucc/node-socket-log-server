@@ -1,6 +1,6 @@
-function initializeTranslation(Alpine: any) {
+function initializeTranslation(Alpine: any, currentLanguage: string = 'en') {
     Alpine.store('lang', {
-        current: 'en',
+        current: currentLanguage,
         en: {
             page_logging: 'Logging',
             page_metrics: 'Metrics',
@@ -40,7 +40,8 @@ function initializeTranslation(Alpine: any) {
             metrics_net_in: 'Traffic In MB',
             metrics_net_out: 'Traffic Out MB',
             metrics_error_rate: 'Error Rate',
-            incoming_logs: 'Incoming Log Messages',
+            metrics_logs: 'Incoming Log Messages',
+            triggers_id: 'ID',
             triggers_add: 'Add',
             triggers_add_title: 'Add Trigger',
             triggers_edit: 'Edit',

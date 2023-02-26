@@ -51,10 +51,10 @@
         <label class="mt-2 mb-1" x-text="trans('triggers_value')"></label>
         <select class="form-control" type="text" x-model="$store.controls.trigger_edit_value">
             <option value="errors" x-text="trans('metrics_error_rate')">Errors</option>
-            <option value="logs" x-text="trans('incoming_logs')"></option>
+            <option value="logs" x-text="trans('metrics_logs')"></option>
             <option value="cpu" x-text="trans('metrics_cpu')"></option>
-            <option value="memory" x-text="trans('metrics_mem_used')"></option>
-            <option value="disk" x-text="trans('metrics_disk_used')"></option>
+            <option value="mem_used" x-text="trans('metrics_mem_used')"></option>
+            <option value="disk_used" x-text="trans('metrics_disk_used')"></option>
             <option value="io_write" x-text="trans('metrics_io_write')"></option>
             <option value="io_read" x-text="trans('metrics_io_read')"></option>
             <option value="net_in" x-text="trans('metrics_net_in')"></option>
@@ -187,7 +187,7 @@
                         <div class="col-md-2">
                             <p x-text="trans('filter_by_channel')"></p>
                             <select class="form-control mt-2" x-model="$store.controls.channelFilter" multiple>
-                                <template x-for="channel in $store.log.channels">
+                                <template x-for="channel in $store.data.channels">
                                     <option x-bind:value="channel" x-text="channel"></option>
                                 </template>
                             </select>
@@ -198,7 +198,7 @@
                         <div class="col-md-2">
                             <p x-text="trans('filter_by_server')"></p>
                             <select class="form-control mt-2" x-model="$store.controls.serverFilter" multiple>
-                                <template x-for="server in $store.log.servers">
+                                <template x-for="server in $store.data.servers">
                                     <option x-bind:value="server" x-text="server"></option>
                                 </template>
                             </select>
@@ -213,7 +213,7 @@
                             x-text="i" @click="$store.controls.page = i-1">
                         </div>
                     </template>
-                    <template x-for="message in $store.log.messages">
+                    <template x-for="message in $store.data.messages">
                         <div class="alert alert-dark info-message-dark">
                             <b x-text="trans('time')"></b> <span
                                 x-text="new Date(parseInt(message.time)).toISOString().replace(/Z|T/g,' ')"></span><br>
@@ -229,7 +229,7 @@
 
                 <!-- Metrics Page -->
                 <div x-show="$store.controls.showPage === 1" class="mt-2">
-                    <template x-for="server in $store.log.servers">
+                    <template x-for="server in $store.data.servers">
                         <div class="bd-example col-md-12 mt-2 info-message-dark">
                             <div x-text="server" class="text-center"></div>
                             <template x-for="metric in $store.controls.metrics">
@@ -244,22 +244,27 @@
                 <!-- Triggers Page -->
                 <div x-show="$store.controls.showPage === 2" class="mt-2">
                     <button> </button>
-                    <template x-for="message in $store.log.triggers">
+                    <template x-for="trigger in $store.data.triggers">
                         <div class="alert alert-dark info-message-dark">
-                            <b x-text="trans('time')"></b> <span
-                                x-text="new Date(parseInt(message.time)).toISOString().replace('/Z|T/g',' ')"></span><br>
-                            <b x-text="trans('message')"></b> <span x-text="message.message"></span><br>
-                            <b x-text="trans('level')"></b> <span x-text="message.level"></span><br>
-                            <b x-text="trans('server')"></b> <span x-text="message.server"></span><br>
-                            <b x-text="trans('data')"></b>
-                            <pre x-html="prettifyJson(JSON.stringify(JSON.parse(message.data), undefined, 2))"></pre>
+                            <template x-for="property in Object.keys(trigger)">
+                                <div class="mb-2 mt-2">
+                                    <b x-text="trans('triggers_'+property)+': '"></b>
+                                    <span x-text="property === 'value' ? trans('metrics_'+trigger[property]) :
+                                    property === 'type' ? trans('triggers_type_'+trigger[property]) :
+                                        trigger[property]"></span>
+                                </div>
+                            </template>
+                            <button class="alert btn btn-primary w-25" x-text="trans('triggers_edit')"
+                                x-on:click="editTriggerModal(trigger.id)"> </button>
+                            <button class="alert btn btn-primary w-25" x-text="trans('triggers_delete')"
+                                x-on:click="deleteTrigger(trigger.id)"> </button>
                         </div>
                     </template>
                 </div>
 
                 <!-- Trigger Messages Page -->
                 <div x-show="$store.controls.showPage === 3" class="mt-2">
-                    <template x-for="message in $store.log.trigger_messages">
+                    <template x-for="message in $store.data.trigger_messages">
                         <div class="alert alert-dark info-message-dark">
                             <b x-text="trans('time')"></b> <span
                                 x-text="new Date(parseInt(message.time)).toISOString().replace('/Z|T/g',' ')"></span><br>

@@ -1,4 +1,7 @@
-var Alpine: any;
+var Alpine: {
+    store(store: string, data: any): void
+    store(store: string): any
+};
 var Chart: any;
 const _global = (window || global) as any
 
@@ -20,14 +23,47 @@ async function authenticate() {
 async function updateServerList() {
     let response = await fetch('/servers', basicPost());
     let json = await response.json();
-    Alpine.store('log').servers = json;
+    Alpine.store('data').servers = json;
 }
 
 async function updateTriggerList() {
     let response = await fetch('/triggers', basicPost());
     let json = await response.json();
-    Alpine.store('log').triggers = json;
+    Alpine.store('data').triggers = json;
 }
+
+async function editTriggerModal(id: number) {
+    Alpine.store('data').triggers.forEach((element: any) => {
+        if (element.id === id) {
+            addTriggerModal();
+            Alpine.store('controls').trigger_edit_id = id;
+            Alpine.store('controls').trigger_edit_name = element.name;
+            Alpine.store('controls').trigger_edit_description = element.description;
+            Alpine.store('controls').trigger_edit_type = element.type;
+            Alpine.store('controls').trigger_edit_value = element.value;
+            Alpine.store('controls').trigger_edit_threshold = element.threshold;
+            Alpine.store('controls').trigger_edit_time = element.time;
+        }
+    });
+}
+
+async function addTriggerModal() {
+    Alpine.store('controls').trigger_edit_id = 0;
+    Alpine.store('controls').showTriggerModal = true;
+}
+
+async function saveTrigger() {
+
+}
+
+async function deleteTrigger(id: number) {
+    if (confirm(_global.trans('triggers_delete_question').replace('%s', id))) {
+        let data = basicPost();
+        data.body = JSON.stringify({ id });
+        fetch('/triggers/delete', data);
+    }
+}
+
 
 async function getTriggerMessages() {
     let data = basicPost();
@@ -40,14 +76,14 @@ async function getTriggerMessages() {
 
     let response = await fetch('/trigger_messages', data);
     let json = await response.json();
-    Alpine.store('log').trigger_messages = json.data;
+    Alpine.store('data').trigger_messages = json.data;
 }
 
 
 async function updateChannelList() {
     let response = await fetch('/channels', basicPost());
     let json = await response.json();
-    Alpine.store('log').channels = json;
+    Alpine.store('data').channels = json;
 }
 
 function getTimestamps(fieldIndex: number) {
@@ -114,6 +150,7 @@ setInterval(async () => {
         try {
             updatingMetadata = true;
             await updateServerList();
+            await updateTriggerList()
             await updateChannelList();
         } catch (err) {
             console.log(err);
@@ -157,7 +194,7 @@ setInterval(async () => { searchLogs(false); }, 333)
 
 document.addEventListener('alpine:init', () => {
 
-    Alpine.store('log', {
+    Alpine.store('data', {
         servers: [],
         channels: [],
         messages: [],
@@ -170,7 +207,7 @@ document.addEventListener('alpine:init', () => {
         datetime2: new Date().toISOString().substring(0, 19),
         metrics: ['cpu', 'mem_used', 'disk_used', 'io_read', 'io_write', 'net_in', 'net_out', 'error_rate'],
         showAuthModal: true,
-        showTriggerModal: true,
+        showTriggerModal: false,
         trigger_edit_id: 0,
         trigger_edit_name: '',
         trigger_edit_description: '',
@@ -227,7 +264,7 @@ async function search(searchTerm: string, minimumLevel: number, maximumLevel: nu
         let response = await fetch('/search', data);
         let json = await response.json();
 
-        Alpine.store('log').messages = json.data;
+        Alpine.store('data').messages = json.data;
         Alpine.store('controls').lastPage = Math.ceil(json.entryCount / Alpine.store('controls').pageSize);
     } catch (err) {
         console.log(err);
