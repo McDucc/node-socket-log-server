@@ -64,6 +64,7 @@ function initializeTranslation(Alpine, currentLanguage = 'en') {
         },
     });
     return (index) => {
-        return Alpine.store('lang')[Alpine.store('lang').current][index] ?? index;
+        var _a;
+        return (_a = Alpine.store('lang')[Alpine.store('lang').current][index]) !== null && _a !== void 0 ? _a : index;
     };
 }

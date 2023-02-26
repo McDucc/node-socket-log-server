@@ -1,28 +1,33 @@
-import HasApp from '../http/HasApp';
-import { Environment } from './Environment';
-import { DEDICATED_COMPRESSOR_16KB } from 'uWebSockets.js';
-import { URLSearchParams } from 'url';
-import SetupPostgresPool from '../database/PostgresSetup';
-import TableSetup from '../database/TableSetup';
-export default class LoggerWebservice extends HasApp {
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const HasApp_1 = __importDefault(require("../http/HasApp"));
+const Environment_1 = require("./Environment");
+const uWebSockets_js_1 = require("uWebSockets.js");
+const url_1 = require("url");
+const PostgresSetup_1 = __importDefault(require("../database/PostgresSetup"));
+const TableSetup_1 = __importDefault(require("../database/TableSetup"));
+class LoggerWebservice extends HasApp_1.default {
     constructor() {
-        super(Environment.logger_port);
+        super(Environment_1.Environment.logger_port);
         this.writeLogQueryName = 'write-log';
-        this.writeLogQueryText = `INSERT INTO ${Environment.postgres.logs_table} (level,time,channel,message,server,data) VALUES ($1,$2,$3,$4,$5,$6)`;
+        this.writeLogQueryText = `INSERT INTO ${Environment_1.Environment.postgres.logs_table} (level,time,channel,message,server,data) VALUES ($1,$2,$3,$4,$5,$6)`;
         this.writeMetricsQueryName = 'write-metric';
-        this.writeMetricsQueryText = `INSERT INTO ${Environment.postgres.metrics_table} 
+        this.writeMetricsQueryText = `INSERT INTO ${Environment_1.Environment.postgres.metrics_table} 
            (time,server,cpu,mem_used,io_read,io_write,disk_used,net_in,net_out)
     VALUES ($1  ,$2    ,$3 ,$4      ,$5     ,$6      ,$7       ,$8    ,$9)`;
-        this.postgresPool = SetupPostgresPool();
-        TableSetup(this.postgresPool);
+        this.postgresPool = (0, PostgresSetup_1.default)();
+        (0, TableSetup_1.default)(this.postgresPool);
         this.app.ws('/log', {
             idleTimeout: 32,
             maxBackpressure: 2 * 1024,
             maxPayloadLength: 4 * 1024,
-            compression: DEDICATED_COMPRESSOR_16KB,
+            compression: uWebSockets_js_1.DEDICATED_COMPRESSOR_16KB,
             upgrade: (res, req, context) => {
-                let parameters = new URLSearchParams(req.getQuery());
-                if (!parameters.get('name') || !parameters.get('auth') || parameters.get('auth') != Environment.logger_password)
+                let parameters = new url_1.URLSearchParams(req.getQuery());
+                if (!parameters.get('name') || !parameters.get('auth') || parameters.get('auth') != Environment_1.Environment.logger_password)
                     return res.end('Unauthorized or name / auth missing.');
                 let name = parameters.get('name');
                 let address = Buffer.from(res.getRemoteAddressAsText()).toString();
@@ -33,7 +38,7 @@ export default class LoggerWebservice extends HasApp {
                 try {
                     this.log(JSON.parse(Buffer.from(message).toString()), ws.name);
                 }
-                catch { }
+                catch (_a) { }
             },
             drain: (_ws) => { },
             close: (ws, code, _message) => {
@@ -61,6 +66,7 @@ export default class LoggerWebservice extends HasApp {
         this.postgresPool.query(this.writeMetricsQueryName, this.writeMetricsQueryText, array);
     }
 }
+exports.default = LoggerWebservice;
 class IncomingData {
     constructor() {
         this.level = 0;

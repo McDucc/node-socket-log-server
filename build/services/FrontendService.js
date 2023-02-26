@@ -1,22 +1,46 @@
-import RequestData from '../http/RequestData';
-import HasApp from '../http/HasApp';
-import * as fs from "fs";
-import { Environment } from './Environment';
-import path from 'path';
-import SetupPostgresPool from '../database/PostgresSetup';
-import { gzipSync } from 'zlib';
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const RequestData_1 = __importDefault(require("../http/RequestData"));
+const HasApp_1 = __importDefault(require("../http/HasApp"));
+const fs = __importStar(require("fs"));
+const Environment_1 = require("./Environment");
+const path_1 = __importDefault(require("path"));
+const PostgresSetup_1 = __importDefault(require("../database/PostgresSetup"));
+const zlib_1 = require("zlib");
 function EndReponse(response, data, closeConnection = false) {
     if (!response.ended) {
         response.end(data, closeConnection);
     }
 }
-export default class FrontEndcontroller extends HasApp {
+class FrontEndcontroller extends HasApp_1.default {
     constructor() {
-        super(Environment.frontend_port);
-        this.searchLockLimit = Environment.search_limit;
+        super(Environment_1.Environment.frontend_port);
+        this.searchLockLimit = Environment_1.Environment.search_limit;
         this.searchLock = 0;
         this.searchQuery1Name = 'search-query-1';
-        this.searchQuery1 = `SELECT level,server,time,message,data FROM ${Environment.postgres.logs_table} WHERE 
+        this.searchQuery1 = `SELECT level,server,time,message,data FROM ${Environment_1.Environment.postgres.logs_table} WHERE 
     search @@ plainto_tsquery($1)
     AND channel = ANY($2)
     AND level BETWEEN $3 AND $4
@@ -24,21 +48,21 @@ export default class FrontEndcontroller extends HasApp {
     AND time BETWEEN $6 AND $7
     OFFSET $8 LIMIT $9`;
         this.searchQuery1CountName = 'search-query-1-count';
-        this.searchQuery1Count = `SELECT COUNT(*) as count FROM ${Environment.postgres.logs_table} WHERE 
+        this.searchQuery1Count = `SELECT COUNT(*) as count FROM ${Environment_1.Environment.postgres.logs_table} WHERE 
     search @@ plainto_tsquery($1)
     AND channel = ANY($2)
     AND level BETWEEN $3 AND $4
     AND server = ANY($5)
     AND time BETWEEN $6 AND $7`;
         this.searchQuery2Name = 'search-query-2';
-        this.searchQuery2 = `SELECT channel,level,server,time,message,data FROM ${Environment.postgres.logs_table} WHERE 
+        this.searchQuery2 = `SELECT channel,level,server,time,message,data FROM ${Environment_1.Environment.postgres.logs_table} WHERE 
     channel = ANY($1)
     AND level BETWEEN $2 AND $3
     AND server = ANY($4)
     AND time BETWEEN $5 AND $6
     OFFSET $7 LIMIT $8`;
         this.searchQuery2CountName = 'search-query-2-count';
-        this.searchQuery2Count = `SELECT COUNT(*) as count FROM ${Environment.postgres.logs_table} WHERE 
+        this.searchQuery2Count = `SELECT COUNT(*) as count FROM ${Environment_1.Environment.postgres.logs_table} WHERE 
     channel = ANY($1)
     AND level BETWEEN $2 AND $3
     AND server = ANY($4)
@@ -54,7 +78,7 @@ export default class FrontEndcontroller extends HasApp {
     ROUND(AVG(net_in)::numeric,3) AS net_in,
     ROUND(AVG(net_out)::numeric,3) AS net_out,
     0 AS error_rate,
-    FLOOR((time - $1 + 0.00001) / ($2::numeric - $1) * $3) as slice FROM ${Environment.postgres.metrics_table} WHERE
+    FLOOR((time - $1 + 0.00001) / ($2::numeric - $1) * $3) as slice FROM ${Environment_1.Environment.postgres.metrics_table} WHERE
     time BETWEEN $1 AND $2
     GROUP BY slice, server
     ORDER BY slice`;
@@ -68,7 +92,7 @@ export default class FrontEndcontroller extends HasApp {
     AND level > $4
     GROUP BY slice, server
     ORDER BY slice`;
-        this.postgresPool = SetupPostgresPool();
+        this.postgresPool = (0, PostgresSetup_1.default)();
         this.bind('post', '/search', this.search);
         this.bind('post', '/metrics', this.searchMetrics);
         this.bind('post', '/auth', this.authTest);
@@ -96,20 +120,20 @@ export default class FrontEndcontroller extends HasApp {
             request.forEach((headerKey, headerValue) => {
                 headers[headerKey] = headerValue;
             });
-            if (auth && headers['auth-token'] !== Environment.logger_password) {
+            if (auth && headers['auth-token'] !== Environment_1.Environment.logger_password) {
                 return EndReponse(response, 'Unauthenticated');
             }
             let body = Buffer.from('');
             response.onData(async (data, isLast) => {
                 body = Buffer.concat([body, Buffer.from(data)]);
                 if (isLast) {
-                    handler(new RequestData(headers, body.toString()), response);
+                    handler(new RequestData_1.default(headers, body.toString()), response);
                 }
             });
         });
     }
     async serveFile(file) {
-        let filePath = path.resolve(__dirname, './../frontend/' + file);
+        let filePath = path_1.default.resolve(__dirname, './../frontend/' + file);
         if (!fs.existsSync(filePath))
             console.log(new Error(filePath + ' does not exist and can not be bound to router!'));
         this.bind('get', '/' + file, (_request, response) => {
@@ -225,7 +249,7 @@ export default class FrontEndcontroller extends HasApp {
             data.page = parameters.page;
             response.writeStatus('200 OK');
             response.writeHeader('Content-Encoding', 'gzip');
-            EndReponse(response, gzipSync(JSON.stringify(data), { level: 9, memLevel: 9 }));
+            EndReponse(response, (0, zlib_1.gzipSync)(JSON.stringify(data), { level: 9, memLevel: 9 }));
         }
     }
     async createTrigger(request, response) {
@@ -248,11 +272,11 @@ export default class FrontEndcontroller extends HasApp {
         let data = await this.metricsLookup(parameters.intervalStart, parameters.intervalEnd, parameters.resolution);
         response.writeStatus('200 OK');
         response.writeHeader('Content-Encoding', 'gzip');
-        EndReponse(response, gzipSync(JSON.stringify(data), { level: 9, memLevel: 9 }));
+        EndReponse(response, (0, zlib_1.gzipSync)(JSON.stringify(data), { level: 9, memLevel: 9 }));
     }
     async metricsLookup(minimumTime, maximumTime, resolution = 30) {
         let data = await this.postgresPool.query(this.metricsQueryName, this.metricsQuery, [minimumTime, maximumTime, resolution]);
-        let errorRate = await this.postgresPool.query(this.errorRateQueryName, this.errorRateQuery, [minimumTime, maximumTime, resolution, Environment.error_rate_level]);
+        let errorRate = await this.postgresPool.query(this.errorRateQueryName, this.errorRateQuery, [minimumTime, maximumTime, resolution, Environment_1.Environment.error_rate_level]);
         data.forEach(dataElement => {
             errorRate.forEach(errorRateElement => {
                 if (dataElement.slice == errorRateElement.slice && dataElement.server == errorRateElement.server) {
@@ -299,6 +323,7 @@ export default class FrontEndcontroller extends HasApp {
         };
     }
 }
+exports.default = FrontEndcontroller;
 class SearchParameters {
     constructor() {
         this.minimumLevel = 0;

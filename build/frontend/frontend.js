@@ -88,6 +88,7 @@ let metricsCompiled = {};
 let metricsCompiledLabels = {};
 async function updateMetrics() {
     var _a, _b, _c, _d;
+    var _e, _f, _g, _h;
     try {
         let data = basicPost();
         let resolution = 15;
@@ -106,11 +107,11 @@ async function updateMetrics() {
             metricsCompiled = {};
             metricsCompiledLabels = {};
             for (let metricEntry of json.data) {
-                metricsCompiled[_a = metricEntry.server] ?? (metricsCompiled[_a] = {});
-                metricsCompiledLabels[_b = metricEntry.server] ?? (metricsCompiledLabels[_b] = {});
+                (_a = metricsCompiled[_e = metricEntry.server]) !== null && _a !== void 0 ? _a : (metricsCompiled[_e] = {});
+                (_b = metricsCompiledLabels[_f = metricEntry.server]) !== null && _b !== void 0 ? _b : (metricsCompiledLabels[_f] = {});
                 for (let metricKey of Alpine.store('controls').metrics) {
-                    (_c = metricsCompiled[metricEntry.server])[metricKey] ?? (_c[metricKey] = []);
-                    (_d = metricsCompiledLabels[metricEntry.server])[metricKey] ?? (_d[metricKey] = []);
+                    (_c = (_g = metricsCompiled[metricEntry.server])[metricKey]) !== null && _c !== void 0 ? _c : (_g[metricKey] = []);
+                    (_d = (_h = metricsCompiledLabels[metricEntry.server])[metricKey]) !== null && _d !== void 0 ? _d : (_h[metricKey] = []);
                     metricsCompiled[metricEntry.server][metricKey][metricEntry.slice] = metricEntry[metricKey];
                     let time = new Date(intervalStart + metricEntry.slice * timePerSlice).toISOString().split('.')[0].replace('T', ' ');
                     metricsCompiledLabels[metricEntry.server][metricKey].push(time);
