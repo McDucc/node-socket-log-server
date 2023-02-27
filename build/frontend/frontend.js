@@ -25,25 +25,36 @@ async function updateTriggerList() {
     let json = await response.json();
     Alpine.store('data').triggers = json;
 }
-async function editTriggerModal(id) {
+function editTriggerModal(id) {
     Alpine.store('data').triggers.forEach((element) => {
         if (element.id === id) {
             addTriggerModal();
-            Alpine.store('controls').trigger_edit_id = id;
-            Alpine.store('controls').trigger_edit_name = element.name;
-            Alpine.store('controls').trigger_edit_description = element.description;
-            Alpine.store('controls').trigger_edit_type = element.type;
-            Alpine.store('controls').trigger_edit_value = element.value;
-            Alpine.store('controls').trigger_edit_threshold = element.threshold;
-            Alpine.store('controls').trigger_edit_time = element.time;
+            for (let property of Object.keys(element)) {
+                Alpine.store('controls').trigger_edit[property] = element[property];
+            }
         }
     });
 }
-async function addTriggerModal() {
-    Alpine.store('controls').trigger_edit_id = 0;
+function addTriggerModal() {
+    scroll(0, 0);
+    Alpine.store('controls').trigger_edit.id = 0;
     Alpine.store('controls').showTriggerModal = true;
 }
-async function saveTrigger() {
+function saveTrigger() {
+    let data = basicPost();
+    let body = {};
+    for (let property of Object.keys(Alpine.store('controls').trigger_edit)) {
+        body[property] = Alpine.store('controls').trigger_edit[property];
+    }
+    if (body.id === 0) {
+        delete body.id;
+        data.body = JSON.stringify(body);
+        fetch('/triggers/update', data);
+    }
+    else {
+        data.body = JSON.stringify(body);
+        fetch('/triggers/create', data);
+    }
 }
 async function deleteTrigger(id) {
     if (confirm(_global.trans('triggers_delete_question').replace('%s', id))) {
@@ -60,7 +71,7 @@ async function getTriggerMessages() {
         pageSize: Alpine.store('controls').pageSize,
         page: Alpine.store('controls').pageTriggerMessages
     });
-    let response = await fetch('/trigger_messages', data);
+    let response = await fetch('/triggers/messages', data);
     let json = await response.json();
     Alpine.store('data').trigger_messages = json.data;
 }
@@ -186,13 +197,16 @@ document.addEventListener('alpine:init', () => {
         metrics: ['cpu', 'mem_used', 'disk_used', 'io_read', 'io_write', 'net_in', 'net_out', 'error_rate'],
         showAuthModal: true,
         showTriggerModal: false,
-        trigger_edit_id: 0,
-        trigger_edit_name: '',
-        trigger_edit_description: '',
-        trigger_edit_type: '',
-        trigger_edit_value: '',
-        trigger_edit_threshold: 0,
-        trigger_edit_time: 0,
+        trigger_edit: {
+            id: 0,
+            name: '',
+            description: '',
+            type: '',
+            value: '',
+            threshold: 0,
+            time: 0,
+            active: true
+        },
         showPage: 0,
         autoUpdate: false,
         autoUpdateSpeed: 3000,

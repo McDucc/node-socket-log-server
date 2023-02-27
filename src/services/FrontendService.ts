@@ -7,13 +7,8 @@ import { Environment } from './Environment';
 import path from 'path';
 import Postgres from 'postgres';
 import SetupPostgresPool from '../database/PostgresSetup';
-import { gzipSync } from 'zlib';
-
-function EndReponse(response: HttpResponse, data: RecognizedString, closeConnection: boolean = false) {
-    if (!response.ended) {
-        response.end(data, closeConnection)
-    }
-}
+import { gzip } from 'zlib';
+import SharedService from './SharedService';
 
 export default class FrontEndcontroller extends HasApp {
 
@@ -25,15 +20,15 @@ export default class FrontEndcontroller extends HasApp {
 
     constructor() {
         super(Environment.frontend_port);
-        this.postgresPool = SetupPostgresPool();
+        this.postgresPool = SetupPostgresPool(Environment.postgres.threads.frontend);
 
         this.bind('post', '/search', this.search);
         this.bind('post', '/metrics', this.searchMetrics);
         this.bind('post', '/auth', this.authTest);
         this.bind('post', '/servers', this.getServers);
-        this.bind('post', '/triggers', this.getTriggers);
-        this.bind('post', '/trigger_messages', this.getTriggerMessages);
         this.bind('post', '/channels', this.getChannels);
+        this.bind('post', '/triggers', this.getTriggers);
+        this.bind('post', '/triggers/messages', this.getTriggerMessages);
         this.bind('post', '/triggers/create', this.createTrigger);
         this.bind('post', '/triggers/update', this.updateTrigger);
         this.bind('post', '/triggers/delete', this.deleteTrigger);
@@ -49,82 +44,23 @@ export default class FrontEndcontroller extends HasApp {
         this.startListening();
     }
 
-    bind(method: 'post' | 'get', routePattern: string, handler: (request: RequestData, response: HttpResponse) => void, auth: boolean = true) {
-
-        //this keyword is lost / becomes undefined because the function is passed as an argument
-        //https://stackoverflow.com/questions/4011793/this-is-undefined-in-javascript-class-methods
-        handler = handler.bind(this);
-
-        this.app[method](routePattern, (response, request) => {
-            response.onAborted(() => { response.ended = true });
-
-            let headers: Dictionary<string> = {};
-
-            request.forEach((headerKey, headerValue) => {
-                headers[headerKey] = headerValue;
-            });
-
-            if (auth && headers['auth-token'] !== Environment.logger_password) {
-                return EndReponse(response, 'Unauthenticated');
-            }
-
-            let body = Buffer.from('');
-            response.onData(async (data: ArrayBuffer, isLast: boolean) => {
-                body = Buffer.concat([body, Buffer.from(data)]);
-                if (isLast) {
-                    handler(new RequestData(headers, body.toString()), response);
-                }
-            });
-        });
-    }
-
-    async serveFile(file: string) {
-        let filePath = path.resolve(__dirname, './../frontend/' + file);
-
-        if (!fs.existsSync(filePath))
-            console.log(new Error(filePath + ' does not exist and can not be bound to router!'));
-
-        this.bind('get', '/' + file, (_request: RequestData, response: HttpResponse) => {
-            fs.readFile(filePath, (err, data) => {
-                if (err) console.log(err);
-                EndReponse(response, data);
-            });
-        }, false);
-    }
-
     authTest(_request: RequestData, response: HttpResponse) {
-        return EndReponse(response, 'Authenticated');
+        return this.EndReponse(response, 'Authenticated');
     }
 
     async getServers(request: RequestData, response: HttpResponse) {
-        EndReponse(response, JSON.stringify(await this.getServerArray()));
-    }
-
-    async getServerArray(): Promise<string[]> {
-        let query1 = await this.postgresPool.query("get-servers", "SELECT DISTINCT server FROM logs ORDER BY server DESC", []);
-        let query2 = await this.postgresPool.query("get-servers-metrics", "SELECT DISTINCT server FROM metrics ORDER BY server DESC", []);
-        let query3 = await this.postgresPool.query("get-servers-trigger-mesages", "SELECT DISTINCT server FROM trigger_messages ORDER BY server DESC", []);
-
-        let data: string[] = query1.map(entry => {
-            return entry.server;
-        });
-
-        query2.concat(query3).forEach(element => {
-            if (!data.includes(element.server)) data.push(element.server);
-        })
-
-        return data;
+        this.EndReponse(response, JSON.stringify(await SharedService.getServerArray(this.postgresPool)));
     }
 
     async getTriggers(request: RequestData, response: HttpResponse) {
         let data = await this.postgresPool.query("get-triggers", "SELECT * from triggers ORDER BY active DESC", []);
-        EndReponse(response, JSON.stringify(data));
+        this.EndReponse(response, JSON.stringify(data));
     }
 
     async getTriggerMessages(request: RequestData, response: HttpResponse) {
         let parameters: TriggerMessagesParameters = JSON.parse(request.data);
         if (parameters.servers === undefined || parameters.servers.length === 0) {
-            parameters.servers = await this.getServerArray();
+            parameters.servers = await SharedService.getServerArray(this.postgresPool);
         }
 
         let data = await this.postgresPool.query("trigger-messages", `
@@ -137,7 +73,7 @@ export default class FrontEndcontroller extends HasApp {
         SELECT COUNT(*) as count from trigger_messages
         WHERE time BETWEEN $1 AND $2`, [parameters.intervalStart, parameters.intervalEnd]))[0].count;
 
-        EndReponse(response, JSON.stringify({
+        this.EndReponse(response, JSON.stringify({
             data,
             pageSize: parameters.pageSize,
             page: parameters.page,
@@ -146,7 +82,7 @@ export default class FrontEndcontroller extends HasApp {
     }
 
     async getChannels(request: RequestData, response: HttpResponse) {
-        EndReponse(response, JSON.stringify(await this.getChannelArray()));
+        this.EndReponse(response, JSON.stringify(await this.getChannelArray()));
     }
 
     async getChannelArray(): Promise<string[]> {
@@ -171,7 +107,7 @@ export default class FrontEndcontroller extends HasApp {
     async search(request: RequestData, response: HttpResponse, mode: 'metrics' | 'database' = 'database') {
 
         if (this.searchLock >= this.searchLockLimit) {
-            return EndReponse(response, 'Locked');
+            return this.EndReponse(response, 'Locked');
         }
 
         try {
@@ -188,7 +124,7 @@ export default class FrontEndcontroller extends HasApp {
             }
         } catch (err: any) {
             response.writeStatus('500 Internal Server Error');
-            EndReponse(response, JSON.stringify({
+            this.EndReponse(response, JSON.stringify({
                 message: err.message,
                 stack: err.stack,
             }));
@@ -200,7 +136,7 @@ export default class FrontEndcontroller extends HasApp {
     async databaseSearch(parametersRaw: any, response: HttpResponse) {
         if (this.parametersInvalid(parametersRaw)) {
             response.writeStatus('400 Bad Request');
-            EndReponse(response, 'Parameters are not within acceptable ranges');
+            this.EndReponse(response, 'Parameters are not within acceptable ranges');
             return;
         } else {
             let parameters: SearchParameters = parametersRaw;
@@ -223,9 +159,7 @@ export default class FrontEndcontroller extends HasApp {
             data.pageSize = parameters.pageSize;
             data.page = parameters.page;
 
-            response.writeStatus('200 OK');
-            response.writeHeader('Content-Encoding', 'gzip');
-            EndReponse(response, gzipSync(JSON.stringify(data), { level: 9, memLevel: 9 }));
+            this.EndReponse(response, JSON.stringify(data));
         }
     }
 
@@ -233,20 +167,20 @@ export default class FrontEndcontroller extends HasApp {
         let data = JSON.parse(request.data);
         let id = await this.postgresPool.query('create-trigger', 'INSERT INTO triggers (name,description,type,value,active,threshold,time) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id',
             [data.name, data.description, data.type, data.value, true, data.threshold, data.time]);
-        EndReponse(response, id[0]);
+        this.EndReponse(response, id[0].id);
     }
 
     async updateTrigger(request: RequestData, response: HttpResponse) {
         let data = JSON.parse(request.data);
         let id = await this.postgresPool.query('update-trigger', 'UPDATE triggers SET name=$1,description=$2,type=$3,value=$4,active=$5,threshold=$6,time=$7 WHERE id=$8',
             [data.name, data.description, data.type, data.value, data.active, data.threshold, data.time, data.id]);
-        EndReponse(response, id[0]);
+        this.EndReponse(response, id[0].id);
     }
 
     async deleteTrigger(request: RequestData, response: HttpResponse) {
         let data = JSON.parse(request.data);
         await this.postgresPool.query('delete-trigger', 'DELETE FROM triggers WHERE id = $1', [data.id]);
-        EndReponse(response, 'OK');
+        this.EndReponse(response, 'OK');
     }
 
     async metricsSearch(parametersRaw: any, response: HttpResponse) {
@@ -257,9 +191,7 @@ export default class FrontEndcontroller extends HasApp {
             parameters.intervalEnd,
             parameters.resolution);
 
-        response.writeStatus('200 OK');
-        response.writeHeader('Content-Encoding', 'gzip');
-        EndReponse(response, gzipSync(JSON.stringify(data), { level: 9, memLevel: 9 }));
+        this.EndReponse(response, JSON.stringify(data));
     }
 
     searchQuery1Name = 'search-query-1';
@@ -317,7 +249,7 @@ export default class FrontEndcontroller extends HasApp {
     FLOOR((time - $1 + 0.00001) / ($2::numeric - $1) * $3) as slice
     FROM logs WHERE
     time BETWEEN $1 AND $2
-    AND level > $4
+    AND level >= $4
     GROUP BY slice, server
     ORDER BY slice`;
 
@@ -368,7 +300,7 @@ export default class FrontEndcontroller extends HasApp {
         let channelsCasted = '{' + channels.join(',') + '}';
 
         if (servers === undefined || servers.length === 0) {
-            servers = await this.getServerArray();
+            servers = await SharedService.getServerArray(this.postgresPool);
         }
 
         let serverCasted = '{' + servers.join(',') + '}';

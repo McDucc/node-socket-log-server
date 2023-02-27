@@ -7,7 +7,7 @@ import SetupPostgresPool from '../database/PostgresSetup';
 import TableSetup from '../database/TableSetup';
 
 
-export default class LoggerWebservice extends HasApp {
+export default class LogService extends HasApp {
 
     postgresPool: Postgres;
 
@@ -22,7 +22,7 @@ export default class LoggerWebservice extends HasApp {
 
         super(Environment.logger_port);
 
-        this.postgresPool = SetupPostgresPool();
+        this.postgresPool = SetupPostgresPool(Environment.postgres.threads.log);
 
         TableSetup(this.postgresPool);
 

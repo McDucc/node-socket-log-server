@@ -1,7 +1,7 @@
 import Postgres from "postgres";
 import { Environment } from "../services/Environment";
 
-export default function SetupPostgresPool() {
+export default function SetupPostgresPool(threads: number) {
     return new Postgres({
         user: Environment.postgres.user,
         host: Environment.postgres.host,
@@ -10,7 +10,7 @@ export default function SetupPostgresPool() {
         schema: Environment.postgres.schema,
         socket: Environment.postgres.socket,
         password: Environment.postgres.password,
-        threads: Environment.postgres.threads,
+        threads,
         queueSize: 65536,
         escapeChar: '\\'
     });

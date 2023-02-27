@@ -1,6 +1,7 @@
 import FrontEndcontroller from './services/FrontendService';
-import LoggerWebservice from './services/LogService';
+import LogService from './services/LogService';
 import cluster, { Worker } from 'cluster';
+import TriggerService from './services/TriggerService';
 
 /**
  * We use the cluster module to create one worker for the webservice and one for the frontend
@@ -9,22 +10,29 @@ import cluster, { Worker } from 'cluster';
  * It would be convenient to theck the type in the environment but it is sadly not available to the master
  */
 if (cluster.isPrimary) {
-    let workerWebservice = cluster.fork({ type: 'ws' }).process.pid;
-    cluster.fork({ type: 'frontend' });
+    let log = cluster.fork({ type: 'log' }).process.pid;
+    let triggers = cluster.fork({ type: 'triggers' }).process.pid;
+    let frontend = cluster.fork({ type: 'frontend' }).process.pid;
 
     cluster.on('exit', (worker: Worker, code: number, signal: string) => {
         console.log(`Worker ${worker.process.pid} died. Code: ${code}. Signal: ${signal}`);
 
-        if (worker.process.pid === workerWebservice) {
-            workerWebservice = cluster.fork({ type: 'ws' }).process.pid;
-        } else {
-            cluster.fork({ type: 'frontend' }).process.pid;
+        if (worker.process.pid === log) {
+            log = cluster.fork({ type: 'log' }).process.pid;
+        } else if (worker.process.pid === triggers) {
+            triggers = cluster.fork({ type: 'triggers' }).process.pid;
+        } else if (worker.process.pid === frontend) {
+            frontend = cluster.fork({ type: 'frontend' }).process.pid;
         }
     });
+
 } else {
-    if (process.env.type === 'ws') {
-        new LoggerWebservice();
-    } else {
+    
+    if (process.env.type === 'log') {
+        new LogService();
+    } else if (process.env.type === 'frontend') {
         new FrontEndcontroller();
+    } else if (process.env.type === 'triggers') {
+        new TriggerService();
     }
 }

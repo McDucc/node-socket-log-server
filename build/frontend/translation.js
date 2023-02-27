@@ -32,6 +32,7 @@ function initializeTranslation(Alpine, currentLanguage = 'en') {
             data: 'Data:',
             password: 'Password:',
             close: 'Close',
+            save: 'Save',
             authenticate: 'Login',
             metrics_cpu: 'CPU Load',
             metrics_mem_used: 'Memory Used %',

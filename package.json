@@ -7,7 +7,9 @@
   "author": "Robert Gudat",
   "license": "MIT",
   "dependencies": {
+    "mail-service": "github:gudatr/node-mail-service",
     "postgres": "gudatr/postgres-pool",
+    "template-engine": "github:gudatr/node-template-engine",
     "uWebSockets.js": "uNetworking/uWebSockets.js#v20.16.0"
   },
   "devDependencies": {
@@ -17,6 +19,7 @@
   "scripts": {
     "start": "tsc && copyfiles -u 1 src/**/*.{html,ico,css,js,map} build/ && node build/app.js",
     "compile": "tsc --build --force && copyfiles -u 1 src/**/*.{html,ico,css,js,map} build/",
-    "start-precomiled": "npm install && node build/app.js"
+    "start-precomiled": "npm install && node build/app.js",
+    "test": ""
   }
 }

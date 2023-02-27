@@ -29,10 +29,24 @@ const Environment_1 = require("./Environment");
 const path_1 = __importDefault(require("path"));
 const PostgresSetup_1 = __importDefault(require("../database/PostgresSetup"));
 const zlib_1 = require("zlib");
-function EndReponse(response, data, closeConnection = false) {
-    if (!response.ended) {
-        response.end(data, closeConnection);
+async function EndReponse(response, data, closeConnection = false, zip = true) {
+    if (zip) {
+        if (response.ended)
+            return;
+        response.writeHeader('Content-Encoding', 'gzip');
+        data = await new Promise((resolve, reject) => {
+            (0, zlib_1.gzip)(data, { level: 9, memLevel: 8 }, (err, data) => {
+                if (err)
+                    return reject(err);
+                resolve(data);
+            });
+        });
     }
+    ;
+    if (response.ended)
+        return;
+    response.writeStatus('200 OK');
+    response.end(data, closeConnection);
 }
 class FrontEndcontroller extends HasApp_1.default {
     constructor() {
@@ -97,9 +111,9 @@ class FrontEndcontroller extends HasApp_1.default {
         this.bind('post', '/metrics', this.searchMetrics);
         this.bind('post', '/auth', this.authTest);
         this.bind('post', '/servers', this.getServers);
-        this.bind('post', '/triggers', this.getTriggers);
-        this.bind('post', '/trigger_messages', this.getTriggerMessages);
         this.bind('post', '/channels', this.getChannels);
+        this.bind('post', '/triggers', this.getTriggers);
+        this.bind('post', '/triggers/messages', this.getTriggerMessages);
         this.bind('post', '/triggers/create', this.createTrigger);
         this.bind('post', '/triggers/update', this.updateTrigger);
         this.bind('post', '/triggers/delete', this.deleteTrigger);
@@ -247,20 +261,18 @@ class FrontEndcontroller extends HasApp_1.default {
             let data = await this.databaseLookup(parameters.searchTerm, parameters.servers, parameters.channels, parameters.minimumLevel, parameters.maximumLevel, parameters.intervalStart, parameters.intervalEnd, parameters.page * parameters.pageSize, parameters.pageSize);
             data.pageSize = parameters.pageSize;
             data.page = parameters.page;
-            response.writeStatus('200 OK');
-            response.writeHeader('Content-Encoding', 'gzip');
-            EndReponse(response, (0, zlib_1.gzipSync)(JSON.stringify(data), { level: 9, memLevel: 9 }));
+            EndReponse(response, JSON.stringify(data));
         }
     }
     async createTrigger(request, response) {
         let data = JSON.parse(request.data);
         let id = await this.postgresPool.query('create-trigger', 'INSERT INTO triggers (name,description,type,value,active,threshold,time) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id', [data.name, data.description, data.type, data.value, true, data.threshold, data.time]);
-        EndReponse(response, id[0]);
+        EndReponse(response, id[0].id);
     }
     async updateTrigger(request, response) {
         let data = JSON.parse(request.data);
         let id = await this.postgresPool.query('update-trigger', 'UPDATE triggers SET name=$1,description=$2,type=$3,value=$4,active=$5,threshold=$6,time=$7 WHERE id=$8', [data.name, data.description, data.type, data.value, data.active, data.threshold, data.time, data.id]);
-        EndReponse(response, id[0]);
+        EndReponse(response, id[0].id);
     }
     async deleteTrigger(request, response) {
         let data = JSON.parse(request.data);
@@ -270,9 +282,7 @@ class FrontEndcontroller extends HasApp_1.default {
     async metricsSearch(parametersRaw, response) {
         let parameters = parametersRaw;
         let data = await this.metricsLookup(parameters.intervalStart, parameters.intervalEnd, parameters.resolution);
-        response.writeStatus('200 OK');
-        response.writeHeader('Content-Encoding', 'gzip');
-        EndReponse(response, (0, zlib_1.gzipSync)(JSON.stringify(data), { level: 9, memLevel: 9 }));
+        EndReponse(response, JSON.stringify(data));
     }
     async metricsLookup(minimumTime, maximumTime, resolution = 30) {
         let data = await this.postgresPool.query(this.metricsQueryName, this.metricsQuery, [minimumTime, maximumTime, resolution]);
