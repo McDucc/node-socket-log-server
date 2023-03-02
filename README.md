@@ -1,2 +1,2 @@
-# node-socket-log-server
-Server Repo for Socket Log, a lightweight network log using sockets as a transport and leveldown as a store
+### Node.JS Log Server
+Server Repo for a network log using uWebsockets for transport and PostgreSQL as a database.
