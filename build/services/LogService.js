@@ -9,7 +9,8 @@ const uWebSockets_js_1 = require("uWebSockets.js");
 const url_1 = require("url");
 const PostgresSetup_1 = __importDefault(require("../database/PostgresSetup"));
 const TableSetup_1 = __importDefault(require("../database/TableSetup"));
-class LoggerWebservice extends HasApp_1.default {
+const SharedService_1 = __importDefault(require("./SharedService"));
+class LogService extends HasApp_1.default {
     constructor() {
         super(Environment_1.Environment.logger_port);
         this.writeLogQueryName = 'write-log';
@@ -18,7 +19,7 @@ class LoggerWebservice extends HasApp_1.default {
         this.writeMetricsQueryText = `INSERT INTO ${Environment_1.Environment.postgres.metrics_table} 
            (time,server,cpu,mem_used,io_read,io_write,disk_used,net_in,net_out)
     VALUES ($1  ,$2    ,$3 ,$4      ,$5     ,$6      ,$7       ,$8    ,$9)`;
-        this.postgresPool = (0, PostgresSetup_1.default)();
+        this.postgresPool = (0, PostgresSetup_1.default)(Environment_1.Environment.postgres.threads.log);
         (0, TableSetup_1.default)(this.postgresPool);
         this.app.ws('/log', {
             idleTimeout: 32,
@@ -31,7 +32,7 @@ class LoggerWebservice extends HasApp_1.default {
                     return res.end('Unauthorized or name / auth missing.');
                 let name = parameters.get('name');
                 let address = Buffer.from(res.getRemoteAddressAsText()).toString();
-                console.log(`[${new Date().toISOString()}] Accepted connection with ${name} - Address: ${address}`);
+                SharedService_1.default.log(`Accepted connection with ${name} - Address: ${address}`);
                 res.upgrade({ name, address }, req.getHeader('sec-websocket-key'), req.getHeader('sec-websocket-protocol'), req.getHeader('sec-websocket-extensions'), context);
             },
             message: (ws, message) => {
@@ -42,7 +43,7 @@ class LoggerWebservice extends HasApp_1.default {
             },
             drain: (_ws) => { },
             close: (ws, code, _message) => {
-                console.log(`[${new Date().toISOString()}] WebSocket closed: ${ws.address}, name: ${ws.name}, code: ${code}, message: ${Buffer.from(_message).toString()}`);
+                SharedService_1.default.log(`WebSocket closed: ${ws.address}, name: ${ws.name}, code: ${code}, message: ${Buffer.from(_message).toString()}`);
             }
         });
         this.startListening();
@@ -66,7 +67,7 @@ class LoggerWebservice extends HasApp_1.default {
         this.postgresPool.query(this.writeMetricsQueryName, this.writeMetricsQueryText, array);
     }
 }
-exports.default = LoggerWebservice;
+exports.default = LogService;
 class IncomingData {
     constructor() {
         this.level = 0;

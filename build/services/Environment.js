@@ -18,8 +18,12 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Environment = void 0;
 const fs = __importStar(require("fs"));
+const SharedService_1 = __importDefault(require("./SharedService"));
 exports.Environment = JSON.parse(fs.readFileSync('env.json').toString());
-console.log(`[${new Date().toISOString()}] Environment file read`);
+SharedService_1.default.log(`Environment file read`);

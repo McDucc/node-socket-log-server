@@ -1,13 +1,9 @@
 import RequestData from '../http/RequestData';
-import { HttpResponse, RecognizedString } from "uWebSockets.js";
-import { Dictionary } from "../http/RequestData";
+import { HttpResponse } from "uWebSockets.js";
 import HasApp from '../http/HasApp';
-import * as fs from "fs";
 import { Environment } from './Environment';
-import path from 'path';
 import Postgres from 'postgres';
 import SetupPostgresPool from '../database/PostgresSetup';
-import { gzip } from 'zlib';
 import SharedService from './SharedService';
 
 export default class FrontEndcontroller extends HasApp {
@@ -53,7 +49,7 @@ export default class FrontEndcontroller extends HasApp {
     }
 
     async getTriggers(request: RequestData, response: HttpResponse) {
-        let data = await this.postgresPool.query("get-triggers", "SELECT * from triggers ORDER BY active DESC", []);
+        let data = await this.postgresPool.query("get-triggers", "SELECT * FROM triggers ORDER BY active DESC", []);
         this.EndReponse(response, JSON.stringify(data));
     }
 
@@ -66,8 +62,7 @@ export default class FrontEndcontroller extends HasApp {
         let data = await this.postgresPool.query("trigger-messages", `
         SELECT * from trigger_messages
         WHERE time BETWEEN $1 AND $2
-        OFFSET $3 LIMIT $4
-        ORDER BY active DESC`, [parameters.intervalStart, parameters.intervalEnd, parameters.page * parameters.pageSize, parameters.pageSize]);
+        OFFSET $3 LIMIT $4`, [parameters.intervalStart, parameters.intervalEnd, parameters.page * parameters.pageSize, parameters.pageSize]);
 
         let entryCount = (await this.postgresPool.query("trigger-messages-count", `
         SELECT COUNT(*) as count from trigger_messages

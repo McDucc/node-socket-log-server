@@ -2,6 +2,7 @@ import FrontEndcontroller from './services/FrontendService';
 import LogService from './services/LogService';
 import cluster, { Worker } from 'cluster';
 import TriggerService from './services/TriggerService';
+import SharedService from './services/SharedService';
 
 /**
  * We use the cluster module to create one worker for the webservice and one for the frontend
@@ -15,7 +16,7 @@ if (cluster.isPrimary) {
     let frontend = cluster.fork({ type: 'frontend' }).process.pid;
 
     cluster.on('exit', (worker: Worker, code: number, signal: string) => {
-        console.log(`Worker ${worker.process.pid} died. Code: ${code}. Signal: ${signal}`);
+        SharedService.log(`Worker ${worker.process.pid} died. Code: ${code}. Signal: ${signal}`);
 
         if (worker.process.pid === log) {
             log = cluster.fork({ type: 'log' }).process.pid;
@@ -27,7 +28,7 @@ if (cluster.isPrimary) {
     });
 
 } else {
-    
+
     if (process.env.type === 'log') {
         new LogService();
     } else if (process.env.type === 'frontend') {

@@ -1,5 +1,6 @@
 import Postgres from 'postgres';
 import { Environment } from '../services/Environment';
+import SharedService from '../services/SharedService';
 export default async function c(pool: Postgres): Promise<boolean> {
 
     //Temporary sleep to prevent conflicts with the pg pool startup
@@ -15,7 +16,7 @@ export default async function c(pool: Postgres): Promise<boolean> {
         AND table_name = $2;`, [Environment.postgres.schema, Environment.postgres.logs_table]);
     if (table_columns.length === 0) {
         let client = await pool.connect();
-        console.log(`[${new Date().toISOString()}] Running table setup as logs table (${Environment.postgres.logs_table}) does not exist.`);
+        SharedService.log(`Running table setup as logs table (${Environment.postgres.logs_table}) does not exist.`);
 
         try {
             await client.queryString(`
@@ -29,7 +30,7 @@ export default async function c(pool: Postgres): Promise<boolean> {
                 data VARCHAR(4096),
                 search TSVECTOR);`);
 
-            console.log(`[${new Date().toISOString()}] Created logs table as ${Environment.postgres.logs_table}`);
+            SharedService.log(`Created logs table as ${Environment.postgres.logs_table}`);
 
             await client.queryString(`
             CREATE TABLE ${Environment.postgres.metrics_table} (
@@ -44,7 +45,7 @@ export default async function c(pool: Postgres): Promise<boolean> {
                 net_in REAL,
                 net_out REAL);`);
 
-            console.log(`[${new Date().toISOString()}] Created metrics table as ${Environment.postgres.metrics_table}`);
+            SharedService.log(`Created metrics table as ${Environment.postgres.metrics_table}`);
 
             await client.queryString(`
             CREATE TABLE ${Environment.postgres.triggers_table} (
@@ -57,7 +58,7 @@ export default async function c(pool: Postgres): Promise<boolean> {
                 threshold REAL,
                 time INT);`);
 
-            console.log(`[${new Date().toISOString()}] Created triggers table as ${Environment.postgres.triggers_table}`);
+            SharedService.log(`Created triggers table as ${Environment.postgres.triggers_table}`);
 
             await client.queryString(`
             CREATE TABLE ${Environment.postgres.trigger_messages_table} (
@@ -67,7 +68,7 @@ export default async function c(pool: Postgres): Promise<boolean> {
                 value REAL,
                 time BIGINT);`);
 
-            console.log(`[${new Date().toISOString()}] Created trigger messages table as ${Environment.postgres.trigger_messages_table}`);
+            SharedService.log(`Created trigger messages table as ${Environment.postgres.trigger_messages_table}`);
 
             await client.queryString(`
             CREATE FUNCTION logs_search_tsvector_update() RETURNS trigger AS $$
@@ -80,7 +81,7 @@ export default async function c(pool: Postgres): Promise<boolean> {
                 END
             $$ LANGUAGE plpgsql`);
 
-            console.log(`[${new Date().toISOString()}] Created function logs_search_tsvector_update`);
+            SharedService.log(`Created function logs_search_tsvector_update`);
 
             await client.queryString(`
             CREATE TRIGGER logs_search_tsvector_trigger
@@ -88,7 +89,7 @@ export default async function c(pool: Postgres): Promise<boolean> {
             ON ${Environment.postgres.logs_table} FOR EACH ROW
             EXECUTE PROCEDURE logs_search_tsvector_update(); `);
 
-            console.log(`[${new Date().toISOString()}] Created trigger logs_search_tsvector_trigger`);
+            SharedService.log(`Created trigger logs_search_tsvector_trigger`);
 
             await client.queryString(`
             CREATE INDEX logs_level_index ON ${Environment.postgres.logs_table} USING BTREE(level); `);
@@ -117,14 +118,14 @@ export default async function c(pool: Postgres): Promise<boolean> {
             await client.queryString(`
             CREATE INDEX metrics_server_index ON ${Environment.postgres.metrics_table} USING HASH(server); `);
 
-            console.log(`[${new Date().toISOString()}] Created indexes`);
+            SharedService.log(`Created indexes`);
 
         } catch (err) {
             client.release();
-            console.log(`[${new Date().toISOString()}] Table Setup failed`, err);
+            SharedService.log(`Table Setup failed`, err);
             return false;
         }
-        console.log(`[${new Date().toISOString()}] Table Setup successful`);
+        SharedService.log(`Table Setup successful`);
         return true;
     }
 
@@ -132,13 +133,13 @@ export default async function c(pool: Postgres): Promise<boolean> {
 
     for (let column of table_columns) {
         if (!required_columns.includes(column.column_name)) {
-            console.log(`[${new Date().toISOString()}] Table setup failed: Logs table ${Environment.postgres.logs_table} exists but does not contain the required columns`);
+            SharedService.log(`Table setup failed: Logs table ${Environment.postgres.logs_table} exists but does not contain the required columns`);
             return false;
         }
     }
 
-    console.log(`[${new Date().toISOString()}] Table setup skipped`);
-    console.log(`[${new Date().toISOString()}] If you were expecting the setup to execute, please consult the documentation's troubleshooting section`);
+    SharedService.log(`Table setup skipped`);
+    SharedService.log(`If you were expecting the setup to execute, please consult the documentation's troubleshooting section`);
 
     return true;
 }

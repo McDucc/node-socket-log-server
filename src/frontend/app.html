@@ -85,7 +85,7 @@
     </div>
 
     <div class="col-md-11 mt-3 m-auto">
-        <a class="title-x blue-text">WS</a>
+        <a class="title-x blue-text">NWS</a>
         <a class="title-x">Logger</a>
 
         <!-- Controls header -->
@@ -260,9 +260,7 @@
                             <template x-for="property in Object.keys(trigger)">
                                 <div class="mb-2 mt-2">
                                     <b x-text="trans('triggers_'+property)+': '"></b>
-                                    <span x-text="property === 'value' ? trans('metrics_'+trigger[property]) :
-                                    property === 'type' ? trans('triggers_type_'+trigger[property]) :
-                                        trigger[property]"></span>
+                                    <span x-text="renderTriggerValue(property, trigger)"></span>
                                 </div>
                             </template>
                             <button class="alert btn btn-primary w-25" x-text="trans('triggers_edit')"
@@ -276,15 +274,32 @@
                 <!-- Trigger Messages Page -->
                 <div x-show="$store.controls.showPage === 3" class="mt-2">
                     <template x-for="message in $store.data.trigger_messages">
-                        <div class="alert alert-dark info-message-dark">
+                        <div class="alert alert-dark info-message-dark"
+                            x-data="trigger = getTrigger(message.trigger_id)">
+                            <b x-text="trans('id')"></b> <span x-text="message.id"></span><br>
                             <b x-text="trans('time')"></b> <span
-                                x-text="new Date(parseInt(message.time)).toISOString().replace('/Z|T/g',' ')"></span><br>
-                            <b x-text="trans('message')"></b> <span x-text="message.message"></span><br>
-                            <b x-text="trans('level')"></b> <span x-text="message.level"></span><br>
+                                x-text="new Date(parseInt(message.time)).toISOString().replace(/Z|T/g,' ')"></span><br>
+                            <b x-text="trans('value')"></b> <span x-text="message.value"></span><br>
                             <b x-text="trans('server')"></b> <span x-text="message.server"></span><br>
-                            <b x-text="trans('data')"></b>
-                            <pre x-html="prettifyJson(JSON.stringify(JSON.parse(message.data), undefined, 2))"></pre>
-                        </div>
+
+                            <div class="card mt-2">
+                                <div class="btn-selected">
+                                    <button class="btn btn-primary w-100" data-toggle="collapse"
+                                        x-text="trigger.name + ` (${trigger.id})`"
+                                        x-on:click="collapse('collapse_' + message.id)">
+                                    </button>
+                                </div>
+                                <div :id="'collapse_' + message.id" class="collapse hide btn-selected">
+                                    <div class="card-body">
+                                        <template x-for="property in Object.keys(trigger)">
+                                            <div class="mb-2 mt-2">
+                                                <b x-text="trans('triggers_'+property)+': '"></b>
+                                                <span x-text="renderTriggerValue(property, trigger)"></span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
                     </template>
                 </div>
             </div>

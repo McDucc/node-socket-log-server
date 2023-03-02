@@ -1,6 +1,10 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const Environment_1 = require("../services/Environment");
+const SharedService_1 = __importDefault(require("../services/SharedService"));
 async function c(pool) {
     await new Promise((res) => {
         setTimeout(() => {
@@ -12,7 +16,7 @@ async function c(pool) {
         AND table_name = $2;`, [Environment_1.Environment.postgres.schema, Environment_1.Environment.postgres.logs_table]);
     if (table_columns.length === 0) {
         let client = await pool.connect();
-        console.log(`[${new Date().toISOString()}] Running table setup as logs table (${Environment_1.Environment.postgres.logs_table}) does not exist.`);
+        SharedService_1.default.log(`Running table setup as logs table (${Environment_1.Environment.postgres.logs_table}) does not exist.`);
         try {
             await client.queryString(`
             CREATE TABLE ${Environment_1.Environment.postgres.logs_table} (
@@ -24,7 +28,7 @@ async function c(pool) {
                 message VARCHAR(256),
                 data VARCHAR(4096),
                 search TSVECTOR);`);
-            console.log(`[${new Date().toISOString()}] Created logs table as ${Environment_1.Environment.postgres.logs_table}`);
+            SharedService_1.default.log(`Created logs table as ${Environment_1.Environment.postgres.logs_table}`);
             await client.queryString(`
             CREATE TABLE ${Environment_1.Environment.postgres.metrics_table} (
                 id BIGSERIAL PRIMARY KEY,
@@ -37,7 +41,7 @@ async function c(pool) {
                 disk_used REAL,
                 net_in REAL,
                 net_out REAL);`);
-            console.log(`[${new Date().toISOString()}] Created metrics table as ${Environment_1.Environment.postgres.metrics_table}`);
+            SharedService_1.default.log(`Created metrics table as ${Environment_1.Environment.postgres.metrics_table}`);
             await client.queryString(`
             CREATE TABLE ${Environment_1.Environment.postgres.triggers_table} (
                 id BIGSERIAL PRIMARY KEY,
@@ -48,7 +52,7 @@ async function c(pool) {
                 active BOOLEAN,
                 threshold REAL,
                 time INT);`);
-            console.log(`[${new Date().toISOString()}] Created triggers table as ${Environment_1.Environment.postgres.triggers_table}`);
+            SharedService_1.default.log(`Created triggers table as ${Environment_1.Environment.postgres.triggers_table}`);
             await client.queryString(`
             CREATE TABLE ${Environment_1.Environment.postgres.trigger_messages_table} (
                 id BIGSERIAL PRIMARY KEY,
@@ -56,7 +60,7 @@ async function c(pool) {
                 server VARCHAR(${Environment_1.Environment.postgres.column_server_size}),
                 value REAL,
                 time BIGINT);`);
-            console.log(`[${new Date().toISOString()}] Created trigger messages table as ${Environment_1.Environment.postgres.trigger_messages_table}`);
+            SharedService_1.default.log(`Created trigger messages table as ${Environment_1.Environment.postgres.trigger_messages_table}`);
             await client.queryString(`
             CREATE FUNCTION logs_search_tsvector_update() RETURNS trigger AS $$
             BEGIN
@@ -67,13 +71,13 @@ async function c(pool) {
                 return new;
                 END
             $$ LANGUAGE plpgsql`);
-            console.log(`[${new Date().toISOString()}] Created function logs_search_tsvector_update`);
+            SharedService_1.default.log(`Created function logs_search_tsvector_update`);
             await client.queryString(`
             CREATE TRIGGER logs_search_tsvector_trigger
             BEFORE INSERT OR UPDATE
             ON ${Environment_1.Environment.postgres.logs_table} FOR EACH ROW
             EXECUTE PROCEDURE logs_search_tsvector_update(); `);
-            console.log(`[${new Date().toISOString()}] Created trigger logs_search_tsvector_trigger`);
+            SharedService_1.default.log(`Created trigger logs_search_tsvector_trigger`);
             await client.queryString(`
             CREATE INDEX logs_level_index ON ${Environment_1.Environment.postgres.logs_table} USING BTREE(level); `);
             await client.queryString(`
@@ -92,25 +96,25 @@ async function c(pool) {
             CREATE INDEX metrics_time_index ON ${Environment_1.Environment.postgres.metrics_table} USING BTREE(time);`);
             await client.queryString(`
             CREATE INDEX metrics_server_index ON ${Environment_1.Environment.postgres.metrics_table} USING HASH(server); `);
-            console.log(`[${new Date().toISOString()}] Created indexes`);
+            SharedService_1.default.log(`Created indexes`);
         }
         catch (err) {
             client.release();
-            console.log(`[${new Date().toISOString()}] Table Setup failed`, err);
+            SharedService_1.default.log(`Table Setup failed`, err);
             return false;
         }
-        console.log(`[${new Date().toISOString()}] Table Setup successful`);
+        SharedService_1.default.log(`Table Setup successful`);
         return true;
     }
     let required_columns = ["id", "level", "time", "server", "channel", "message", "data", "search"];
     for (let column of table_columns) {
         if (!required_columns.includes(column.column_name)) {
-            console.log(`[${new Date().toISOString()}] Table setup failed: Logs table ${Environment_1.Environment.postgres.logs_table} exists but does not contain the required columns`);
+            SharedService_1.default.log(`Table setup failed: Logs table ${Environment_1.Environment.postgres.logs_table} exists but does not contain the required columns`);
             return false;
         }
     }
-    console.log(`[${new Date().toISOString()}] Table setup skipped`);
-    console.log(`[${new Date().toISOString()}] If you were expecting the setup to execute, please consult the documentation's troubleshooting section`);
+    SharedService_1.default.log(`Table setup skipped`);
+    SharedService_1.default.log(`If you were expecting the setup to execute, please consult the documentation's troubleshooting section`);
     return true;
 }
 exports.default = c;

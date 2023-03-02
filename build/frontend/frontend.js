@@ -2,6 +2,7 @@
 var Alpine;
 var Chart;
 const _global = (window || global);
+_global.trans = initializeTranslation();
 let basicPost = () => {
     return {
         method: 'POST',
@@ -179,6 +180,7 @@ async function searchLogs(force = false) {
     let now = Date.now();
     if (force || Alpine.store('controls').autoUpdate && ((now - parseInt(Alpine.store('controls').autoUpdateSpeed)) > lastAutoUpdate)) {
         await search(Alpine.store('controls').searchTerm, 0, 10, Alpine.store('controls').pageLogs, Alpine.store('controls').pageSize);
+        await getTriggerMessages();
         lastAutoUpdate = now;
     }
 }
@@ -226,7 +228,6 @@ document.addEventListener('alpine:init', () => {
         password: '',
         authenticated: 0
     });
-    _global.trans = initializeTranslation(Alpine);
 });
 let searchActive = false;
 async function search(searchTerm, minimumLevel, maximumLevel, page, pageSize) {
@@ -256,6 +257,12 @@ async function search(searchTerm, minimumLevel, maximumLevel, page, pageSize) {
     }
     finally {
         searchActive = false;
+    }
+}
+function getTrigger(id) {
+    for (let trigger of Alpine.store('data').triggers) {
+        if (trigger.id == id)
+            return trigger;
     }
 }
 let charts = {};
@@ -329,7 +336,8 @@ function prettifyJson(json) {
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
-    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+    let regex = /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g;
+    return json.replace(regex, function (match) {
         let type = 'alx-number';
         if (/^"/.test(match)) {
             if (/:$/.test(match)) {
@@ -347,4 +355,26 @@ function prettifyJson(json) {
         }
         return '<span class="' + type + '">' + match + '</span>';
     });
+}
+function collapse(id) {
+    let element = document.getElementById(id);
+    if (!element)
+        return;
+    if (element.classList.contains("show")) {
+        element.classList.remove("show");
+    }
+    else {
+        element.classList.add("show");
+    }
+}
+function renderTriggerValue(property, trigger) {
+    if (property === 'value') {
+        return _global.trans('metrics_' + trigger[property]);
+    }
+    else if (property === 'type') {
+        return _global.trans('triggers_type_' + trigger[property]);
+    }
+    else {
+        return trigger[property];
+    }
 }

@@ -1,3 +1,6 @@
 import * as fs from 'fs';
+import SharedService from './SharedService';
+
 export const Environment = JSON.parse(fs.readFileSync('env.json').toString());
-console.log(`[${new Date().toISOString()}] Environment file read`);
+
+SharedService.log(`Environment file read`);

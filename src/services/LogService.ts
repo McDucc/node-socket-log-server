@@ -5,6 +5,7 @@ import { URLSearchParams } from 'url';
 import Postgres from 'postgres';
 import SetupPostgresPool from '../database/PostgresSetup';
 import TableSetup from '../database/TableSetup';
+import SharedService from './SharedService';
 
 
 export default class LogService extends HasApp {
@@ -42,7 +43,7 @@ export default class LogService extends HasApp {
                 let name = parameters.get('name');
                 let address = Buffer.from(res.getRemoteAddressAsText()).toString();
 
-                console.log(`[${new Date().toISOString()}] Accepted connection with ${name} - Address: ${address}`);
+                SharedService.log(`Accepted connection with ${name} - Address: ${address}`);
                 res.upgrade({ name, address },
                     req.getHeader('sec-websocket-key'),
                     req.getHeader('sec-websocket-protocol'),
@@ -59,7 +60,7 @@ export default class LogService extends HasApp {
             drain: (_ws) => { },
 
             close: (ws, code, _message) => {
-                console.log(`[${new Date().toISOString()}] WebSocket closed: ${ws.address}, name: ${ws.name}, code: ${code}, message: ${Buffer.from(_message).toString()}`);
+                SharedService.log(`WebSocket closed: ${ws.address}, name: ${ws.name}, code: ${code}, message: ${Buffer.from(_message).toString()}`);
             }
         });
 

@@ -4,6 +4,7 @@ import { Environment } from '../services/Environment';
 import RequestData from './RequestData';
 import * as fs from "fs";
 import { gzip } from 'zlib';
+import SharedService from '../services/SharedService';
 
 export default class HasApp {
 
@@ -12,7 +13,7 @@ export default class HasApp {
     constructor(public port: number) {
 
         process.on('uncaughtException', function (err) {
-            console.log(err);
+            SharedService.log(err);
             process.exit(1);
         });
 
@@ -29,9 +30,9 @@ export default class HasApp {
     startListening() {
         this.app.listen(Environment.host, this.port, (listenSocket) => {
             if (listenSocket) {
-                console.log(`${this.constructor.name} is listening on ${Environment.host}:${this.port}`)
+                SharedService.log(`${this.constructor.name} is listening on ${Environment.host}:${this.port}`)
             } else {
-                console.log(`${this.constructor.name} could not start listening on ${Environment.host}:${this.port}`)
+                SharedService.log(`${this.constructor.name} could not start listening on ${Environment.host}:${this.port}`)
             }
         })
     }
@@ -70,11 +71,11 @@ export default class HasApp {
         let filePath = path.resolve(__dirname, './../frontend/' + file);
 
         if (!fs.existsSync(filePath))
-            console.log(new Error(filePath + ' does not exist and can not be bound to router!'));
+            SharedService.log(new Error(filePath + ' does not exist and can not be bound to router!'));
 
         this.bind('get', '/' + file, (_request: RequestData, response: HttpResponse) => {
             fs.readFile(filePath, (err, data) => {
-                if (err) console.log(err);
+                if (err) SharedService.log(err);
                 this.EndReponse(response, data);
             });
         }, false);

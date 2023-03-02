@@ -1,9 +1,10 @@
 import Postgres from "postgres";
-import Trigger from "../database/models/Trigger";
+import Trigger from '../database/models/Trigger';
 import SetupPostgresPool from "../database/PostgresSetup";
 import { Environment } from "./Environment";
 import SharedService from './SharedService';
 import MailService from "mail-service";
+import Templater from "template-engine";
 
 export default class TriggerService {
 
@@ -11,14 +12,16 @@ export default class TriggerService {
 
     triggers: Trigger[] = [];
 
-    lastTriggerCheck = 0;
-
     mailer: MailService | undefined = undefined;
+
+    metrics: string[] = ['errors', 'logs', 'cpu', 'mem_used', 'disk_used', 'io_read', 'io_write', 'net_in', 'net_out', 'error_rate'];
 
     constructor() {
         this.postgresPool = SetupPostgresPool(Environment.postgres.threads.triggers);
+
         setTimeout(() => { this.loadTriggers() }, Environment.trigger_reload_cooldown);
-        setTimeout(() => { this.checkTriggers() }, 5000);
+        setTimeout(() => { this.checkTriggers() }, Environment.trigger_execute_cooldown);
+
         if (Environment.mails.use) {
             this.mailer = new MailService(
                 Environment.mails.sender_name,
@@ -32,36 +35,51 @@ export default class TriggerService {
                 Environment.mails.dkim_format,
                 Environment.mails.dkim_selector,
                 Environment.mails.max_payload);
-            this.mailer.listen('127.0.0.1', 5000);
+            this.mailer.listen('127.0.0.1', Environment.mails.port);
         }
+
+        Templater.setTemplateFolder('./mail');
     }
 
     public async loadTriggers() {
         try {
             this.triggers = await this.postgresPool.query("get-triggers", "SELECT * from triggers WHERE active = true", []);
         } catch (err) {
-            console.log('Error while loading triggers from database', err);
+            SharedService.log('Error while loading triggers from database', err);
         }
     }
 
+
+    lastTriggerCheck = 0;
     public async checkTriggers() {
         try {
             this.lastTriggerCheck = Date.now();
+            let servers = await this.getServerArray();
             for (let trigger of this.triggers) {
-                for (let server of await this.getServerArray()) {
-                    if (trigger.value === 'errors') {
-                        await this.handleErrorTrigger(trigger, server);
-                    } else if (trigger.value === 'logs') {
-                        await this.handleLogTrigger(trigger, server);
-                    } else {
-                        await this.handleMetricTrigger(trigger, server);
-                    }
+                for (let server of servers) {
+                    await this.handleTrigger(trigger, server);
                 }
             }
         } catch (err) {
-            console.log('Error while processing triggers', err);
+            SharedService.log('Error while processing triggers', err);
         } finally {
-            setTimeout(() => { this.checkTriggers() }, Math.max(0, 10000 - (Date.now() - this.lastTriggerCheck)));
+            setTimeout(() => { this.checkTriggers() }, Math.max(0, Environment.trigger_execute_cooldown - (Date.now() - this.lastTriggerCheck)));
+        }
+    }
+
+    public async handleTrigger(trigger: Trigger, server: string) {
+        try {
+            if (!this.metrics.includes(trigger.value)) return;
+
+            if (trigger.value === 'errors') {
+                await this.handleErrorTrigger(trigger, server);
+            } else if (trigger.value === 'logs') {
+                await this.handleLogTrigger(trigger, server);
+            } else {
+                await this.handleMetricTrigger(trigger, server);
+            }
+        } catch (err) {
+            SharedService.log('Error while handling trigger', err);
         }
     }
 
@@ -101,7 +119,17 @@ export default class TriggerService {
         return await SharedService.getServerArray(this.postgresPool);
     }
 
-    public async sendMail() {
-        
+    public async sendMail(trigger: Trigger, value: number) {
+        if (!this.mailer) return;
+
+        let content = await Templater.render('triggers.mail.html', { trigger, value, time: new Date().toISOString() });
+
+        this.mailer.sendMail({
+            to: Environment.mails.target,
+            reply: Environment.mails.reply_email,
+            subject: `Trigger ${trigger.id} activated: ${trigger.name}`,
+            html: content,
+            text: content.replace(/<[^>]*>?/gm, '')
+        });
     }
 }

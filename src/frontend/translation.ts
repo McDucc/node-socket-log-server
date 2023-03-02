@@ -1,5 +1,5 @@
-function initializeTranslation(Alpine: any, currentLanguage: string = 'en') {
-    Alpine.store('lang', {
+function initializeTranslation(currentLanguage: string = 'en') {
+    var translation_dictionary: Dictionary<any> = {
         current: currentLanguage,
         en: {
             page_logging: 'Logging',
@@ -28,10 +28,12 @@ function initializeTranslation(Alpine: any, currentLanguage: string = 'en') {
             message: 'Message:',
             level: 'Level:',
             server: 'Server:',
+            value: 'Value:',
             data: 'Data:',
             password: 'Password:',
             close: 'Close',
             save: 'Save',
+            id: 'ID:',
             authenticate: 'Login',
             metrics_cpu: 'CPU Load',
             metrics_mem_used: 'Memory Used %',
@@ -62,9 +64,9 @@ function initializeTranslation(Alpine: any, currentLanguage: string = 'en') {
             triggers_type_lteq: 'Lower or equal',
             triggers_type_lt: 'Lower',
         },
-    });
+    };
 
     return (index: string) => {
-        return Alpine.store('lang')[Alpine.store('lang').current][index] ?? index;
+        return translation_dictionary[translation_dictionary.current][index] ?? index;
     }
 }
