@@ -55,6 +55,7 @@ export default async function c(pool: Postgres): Promise<boolean> {
                 type VARCHAR(16),
                 value VARCHAR(16),
                 active BOOLEAN,
+                send_mails BOOLEAN,
                 threshold REAL,
                 time INT);`);
 

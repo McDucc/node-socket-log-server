@@ -19,8 +19,8 @@ export default class TriggerService {
     constructor() {
         this.postgresPool = SetupPostgresPool(Environment.postgres.threads.triggers);
 
-        setTimeout(() => { this.loadTriggers() }, Environment.trigger_reload_cooldown);
-        setTimeout(() => { this.checkTriggers() }, Environment.trigger_execute_cooldown);
+        setTimeout(() => { this.loadTriggers() }, Environment.trigger_reload_time);
+        setTimeout(() => { this.checkTriggers() }, Environment.trigger_execution_time);
 
         if (Environment.mails.use) {
             this.mailer = new MailService(
@@ -49,6 +49,16 @@ export default class TriggerService {
         }
     }
 
+    public async checkTriggerActivation() {
+        let servers = await this.getServerArray();
+        for (let trigger of this.triggers) {
+            if (!trigger.send_mails) continue;
+            for (let server of servers) {
+                await this.checkIfTriggerWasActivated(trigger, server);
+            }
+        }
+    }
+
 
     lastTriggerCheck = 0;
     public async checkTriggers() {
@@ -63,7 +73,7 @@ export default class TriggerService {
         } catch (err) {
             SharedService.log('Error while processing triggers', err);
         } finally {
-            setTimeout(() => { this.checkTriggers() }, Math.max(0, Environment.trigger_execute_cooldown - (Date.now() - this.lastTriggerCheck)));
+            setTimeout(() => { this.checkTriggers() }, Math.max(0, Environment.trigger_execution_time - (Date.now() - this.lastTriggerCheck)));
         }
     }
 
@@ -119,17 +129,44 @@ export default class TriggerService {
         return await SharedService.getServerArray(this.postgresPool);
     }
 
-    public async sendMail(trigger: Trigger, value: number) {
+
+    readonly triggerMessageExistsName = 'trigger-message-exists';
+    readonly triggerMessageExistsQuery = 'SELECT COUNT(*) as count FROM trigger_messages WHERE trigger_id = $1 AND time BETWEEN $2 AND $3 AND server = $4';
+
+    public async checkIfTriggerWasActivated(trigger: Trigger, server: string) {
+        let now = Date.now();
+
+        let [time1, time2] = await Promise.all([this.postgresPool.query(this.triggerMessageExistsName, this.triggerMessageExistsQuery,
+            [trigger.id, now - Environment.trigger_activation_time, now, server]),
+        this.postgresPool.query(this.triggerMessageExistsName, this.triggerMessageExistsQuery,
+            [trigger.id, now - Environment.trigger_activation_time * 2, now - Environment.trigger_activation_time - 1, server])]);
+
+        let time1Count = time1[0].count;
+        let time2Count = time2[0].count;
+
+        //Activation
+        if (time1Count > 0 && time2Count == 0) {
+            this.sendMail(trigger, 0, 'activated', server) //TODO: value
+        }
+        //Deactivation
+        else if (time1Count == 0 && time2Count > 0) {
+            this.sendMail(trigger, 0, 'deactivated', server) //TODO: value
+        }
+    }
+
+    public async sendMail(trigger: Trigger, value: number, activation: 'activated' | 'deactivated', server: string, receipient: string | null = null) {
         if (!this.mailer) return;
 
-        let content = await Templater.render('triggers.mail.html', { trigger, value, time: new Date().toISOString() });
+        let content = await Templater.render('triggers.mail.html', { trigger, value, time: new Date().toISOString(), activation, server });
 
-        this.mailer.sendMail({
-            to: Environment.mails.target,
-            reply: Environment.mails.reply_email,
-            subject: `Trigger ${trigger.id} activated: ${trigger.name}`,
-            html: content,
-            text: content.replace(/<[^>]*>?/gm, '')
-        });
+        await this.mailer.mail(
+            Environment.mails.sender_email,
+            Environment.mails.sender_name,
+            receipient ?? Environment.mails.receipient,
+            Environment.mails.reply_email,
+            `Trigger ${trigger.id} ${activation} on server ${server}: ${trigger.name}`,
+            content,
+            content.replace(/<[^>]*>?/gm, '')
+        );
     }
 }

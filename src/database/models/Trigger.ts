@@ -5,6 +5,7 @@ export default class Trigger {
     type: string = '';
     value: string = '';
     active: boolean = true;
+    send_mails: boolean = true;
     threshold: number = 0;
     time: number = 0;
 }

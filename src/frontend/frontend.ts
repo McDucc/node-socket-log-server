@@ -169,7 +169,7 @@ setInterval(async () => {
             updatingMetadata = false;
         }
     }
-}, 2000);
+}, 1000);
 
 
 let updatingMetrics = false;
@@ -187,7 +187,7 @@ setInterval(async () => {
             updatingMetrics = false;
         }
     }
-}, 5000);
+}, 3000);
 
 let lastAutoUpdate = 0;
 async function searchLogs(force: boolean = false) {
