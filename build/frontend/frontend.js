@@ -2,7 +2,6 @@
 var Alpine;
 var Chart;
 const _global = (window || global);
-_global.trans = initializeTranslation();
 let basicPost = () => {
     return {
         method: 'POST',
@@ -154,7 +153,7 @@ setInterval(async () => {
             updatingMetadata = false;
         }
     }
-}, 2000);
+}, 1000);
 let updatingMetrics = false;
 setInterval(async () => {
     if (typeof Alpine === 'undefined' || updatingMetrics)
@@ -172,7 +171,7 @@ setInterval(async () => {
             updatingMetrics = false;
         }
     }
-}, 5000);
+}, 3000);
 let lastAutoUpdate = 0;
 async function searchLogs(force = false) {
     if (typeof Alpine === 'undefined')
@@ -228,6 +227,7 @@ document.addEventListener('alpine:init', () => {
         password: '',
         authenticated: 0
     });
+    _global.trans = initializeTranslation();
 });
 let searchActive = false;
 async function search(searchTerm, minimumLevel, maximumLevel, page, pageSize) {
@@ -272,7 +272,7 @@ async function syncCharts() {
         for (let server of servers) {
             for (let metric of Object.keys(metricsCompiled[server])) {
                 let element = document.getElementById(server + ':' + metric);
-                let chartName = server + ' - ' + _global.trans('metrics_' + metric);
+                let chartName = server + ' - ' + _global.trans('metrics_' + metric, 'en');
                 if (element)
                     makeOrUpdateChart(metricsCompiled[server][metric], chartName, metricsCompiledLabels[server][metric], element);
             }

@@ -93,7 +93,20 @@
             <div class="bd-example row col-md-12 alx-messages">
                 <div class="row mt-2 justify-content-center">
                     <div class="col-md-12">
-                        <div class="float-start col-md-2 p-1">
+                        <div class="float-start col-md-1 p-1">
+                            <select id="language-select" class="alert btn btn-primary w-100">
+                                <option value="en">English</option>
+                                <option value="de">Deutsch</option>
+                            </select>
+                        </div>
+
+                        <script>
+                            document.getElementById('language-select').addEventListener("change", function (ev) {
+                                Alpine.store('language').currentLanguage = this.value;
+                            });
+                        </script>
+
+                        <div class="float-start col-md-1 p-1">
                             <button class="alert btn btn-primary w-100"
                                 x-on:click="$store.controls.showAuthModal = true;" x-text="trans('authenticate')">
                             </button>
@@ -289,7 +302,7 @@
                                         x-on:click="collapse('collapse_' + message.id)">
                                     </button>
                                 </div>
-                                <div :id="'collapse_' + message.id" class="collapse hide bd-example-2">
+                                <div :id="'collapse_' + message.id" class="collapse hide btn-selected">
                                     <div class="card-body">
                                         <template x-for="property in Object.keys(trigger)">
                                             <div class="mb-2 mt-2">

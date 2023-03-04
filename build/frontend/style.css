@@ -78,10 +78,6 @@ pre {
     background-color: #19222b;
 }
 
-.bd-example-2 {
-    background-color: #19222b;
-}
-
 .bd-example::after {
     display: block;
     clear: both;

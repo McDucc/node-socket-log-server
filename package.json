@@ -18,9 +18,7 @@
     "copyfiles": "^2.4.1"
   },
   "scripts": {
-    "start": "tsc && copyfiles -u 1 src/**/*.{html,ico,css,js,map} build/ && node build/app.js",
-    "compile": "tsc --build --force && copyfiles -u 1 src/**/*.{html,ico,css,js,map} build/",
-    "start-precomiled": "npm install && node build/app.js",
+    "start": "tsc --build --force && copyfiles -u 1 src/**/*.{html,ico,css,js,map} build/ && node build/app.js",
     "test": ""
   }
 }

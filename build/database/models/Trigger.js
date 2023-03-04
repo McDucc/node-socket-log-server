@@ -8,6 +8,7 @@ class Trigger {
         this.type = '';
         this.value = '';
         this.active = true;
+        this.send_mails = true;
         this.threshold = 0;
         this.time = 0;
     }

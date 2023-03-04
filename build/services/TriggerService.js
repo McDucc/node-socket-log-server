@@ -14,9 +14,11 @@ class TriggerService {
         this.mailer = undefined;
         this.metrics = ['errors', 'logs', 'cpu', 'mem_used', 'disk_used', 'io_read', 'io_write', 'net_in', 'net_out', 'error_rate'];
         this.lastTriggerCheck = 0;
+        this.triggerMessageExistsName = 'trigger-message-exists';
+        this.triggerMessageExistsQuery = 'SELECT COUNT(*) as count FROM trigger_messages WHERE trigger_id = $1 AND time BETWEEN $2 AND $3 AND server = $4';
         this.postgresPool = (0, PostgresSetup_1.default)(Environment_1.Environment.postgres.threads.triggers);
-        setTimeout(() => { this.loadTriggers(); }, Environment_1.Environment.trigger_reload_cooldown);
-        setTimeout(() => { this.checkTriggers(); }, Environment_1.Environment.trigger_execute_cooldown);
+        setTimeout(() => { this.loadTriggers(); }, Environment_1.Environment.trigger_reload_time);
+        setTimeout(() => { this.checkTriggers(); }, Environment_1.Environment.trigger_execution_time);
         if (Environment_1.Environment.mails.use) {
             this.mailer = new mail_service_1.default(Environment_1.Environment.mails.sender_name, Environment_1.Environment.mails.sender_email, Environment_1.Environment.mails.ssl, Environment_1.Environment.mails.key_file, Environment_1.Environment.mails.cert_file, Environment_1.Environment.mails.debug, Environment_1.Environment.mails.passphrase, Environment_1.Environment.mails.dkim_file, Environment_1.Environment.mails.dkim_format, Environment_1.Environment.mails.dkim_selector, Environment_1.Environment.mails.max_payload);
             this.mailer.listen('127.0.0.1', Environment_1.Environment.mails.port);
@@ -29,6 +31,16 @@ class TriggerService {
         }
         catch (err) {
             SharedService_1.default.log('Error while loading triggers from database', err);
+        }
+    }
+    async checkTriggerActivation() {
+        let servers = await this.getServerArray();
+        for (let trigger of this.triggers) {
+            if (!trigger.send_mails)
+                continue;
+            for (let server of servers) {
+                await this.checkIfTriggerWasActivated(trigger, server);
+            }
         }
     }
     async checkTriggers() {
@@ -45,7 +57,7 @@ class TriggerService {
             SharedService_1.default.log('Error while processing triggers', err);
         }
         finally {
-            setTimeout(() => { this.checkTriggers(); }, Math.max(0, Environment_1.Environment.trigger_execute_cooldown - (Date.now() - this.lastTriggerCheck)));
+            setTimeout(() => { this.checkTriggers(); }, Math.max(0, Environment_1.Environment.trigger_execution_time - (Date.now() - this.lastTriggerCheck)));
         }
     }
     async handleTrigger(trigger, server) {
@@ -95,17 +107,24 @@ class TriggerService {
     async getServerArray() {
         return await SharedService_1.default.getServerArray(this.postgresPool);
     }
-    async sendMail(trigger, value) {
+    async checkIfTriggerWasActivated(trigger, server) {
+        let now = Date.now();
+        let [time1, time2] = await Promise.all([this.postgresPool.query(this.triggerMessageExistsName, this.triggerMessageExistsQuery, [trigger.id, now - Environment_1.Environment.trigger_activation_time, now, server]),
+            this.postgresPool.query(this.triggerMessageExistsName, this.triggerMessageExistsQuery, [trigger.id, now - Environment_1.Environment.trigger_activation_time * 2, now - Environment_1.Environment.trigger_activation_time - 1, server])]);
+        let time1Count = time1[0].count;
+        let time2Count = time2[0].count;
+        if (time1Count > 0 && time2Count == 0) {
+            this.sendMail(trigger, 0, 'activated', server);
+        }
+        else if (time1Count == 0 && time2Count > 0) {
+            this.sendMail(trigger, 0, 'deactivated', server);
+        }
+    }
+    async sendMail(trigger, value, activation, server, receipient = null) {
         if (!this.mailer)
             return;
-        let content = await template_engine_1.default.render('triggers.mail.html', { trigger, value, time: new Date().toISOString() });
-        this.mailer.sendMail({
-            to: Environment_1.Environment.mails.target,
-            reply: Environment_1.Environment.mails.reply_email,
-            subject: `Trigger ${trigger.id} activated: ${trigger.name}`,
-            html: content,
-            text: content.replace(/<[^>]*>?/gm, '')
-        });
+        let content = await template_engine_1.default.render('triggers.mail.html', { trigger, value, time: new Date().toISOString(), activation, server });
+        await this.mailer.mail(Environment_1.Environment.mails.sender_email, Environment_1.Environment.mails.sender_name, receipient !== null && receipient !== void 0 ? receipient : Environment_1.Environment.mails.receipient, Environment_1.Environment.mails.reply_email, `Trigger ${trigger.id} ${activation} on server ${server}: ${trigger.name}`, content, content.replace(/<[^>]*>?/gm, ''));
     }
 }
 exports.default = TriggerService;

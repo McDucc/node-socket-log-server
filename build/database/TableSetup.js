@@ -50,6 +50,7 @@ async function c(pool) {
                 type VARCHAR(16),
                 value VARCHAR(16),
                 active BOOLEAN,
+                send_mails BOOLEAN,
                 threshold REAL,
                 time INT);`);
             SharedService_1.default.log(`Created triggers table as ${Environment_1.Environment.postgres.triggers_table}`);

@@ -4,7 +4,6 @@ var Alpine: {
 };
 var Chart: any;
 const _global = (window || global) as any
-_global.trans = initializeTranslation();
 
 let basicPost: any = () => {
     return {
@@ -250,6 +249,8 @@ document.addEventListener('alpine:init', () => {
         password: '',
         authenticated: 0
     });
+
+    _global.trans = initializeTranslation();
 });
 
 
@@ -299,9 +300,10 @@ async function syncCharts() {
         for (let server of servers) {
             for (let metric of Object.keys(metricsCompiled[server])) {
                 let element = <HTMLCanvasElement>document.getElementById(server + ':' + metric);
-                let chartName = server + ' - ' + _global.trans('metrics_' + metric);
+                let chartName = server + ' - ' + _global.trans('metrics_' + metric, 'en');
+                let chartTitle = server + ' - ' + _global.trans('metrics_' + metric, 'en');
                 if (element)
-                    makeOrUpdateChart(metricsCompiled[server][metric], chartName, metricsCompiledLabels[server][metric], element);
+                    makeOrUpdateChart(metricsCompiled[server][metric], chartName, chartTitle, metricsCompiledLabels[server][metric], element);
             }
         }
 
@@ -321,7 +323,7 @@ let chartScaleLayout = {
     }
 };
 
-function makeOrUpdateChart(chartData: number[], chartName: string, chartLabels: string[], element: HTMLCanvasElement) {
+function makeOrUpdateChart(chartData: number[], chartName: string, chartTitle: string, chartLabels: string[], element: HTMLCanvasElement) {
 
     if (charts[chartName] == undefined) {
         let context = element.getContext('2d');
@@ -330,7 +332,7 @@ function makeOrUpdateChart(chartData: number[], chartName: string, chartLabels: 
             data: {
                 labels: chartLabels,
                 datasets: [{
-                    label: chartName,
+                    label: chartTitle,
                     data: chartData,
                     fill: true,
                     backgroundColor: '#07429b',
