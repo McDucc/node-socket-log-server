@@ -92,71 +92,68 @@
         <div class="bd-base row col-md-12">
             <div class="bd-example row col-md-12 alx-messages">
                 <div class="row mt-2 justify-content-center">
-                    <div class="col-md-12">
-                        <div class="float-start col-md-1 p-1">
-                            <select id="language-select" class="alert btn btn-primary w-100">
-                                <option value="en">English</option>
-                                <option value="de">Deutsch</option>
-                            </select>
-                        </div>
+                    <div class="float-start col-sm p-1">
+                        <select id="language-select" class="alert btn btn-primary w-100">
+                            <option value="en">English</option>
+                            <option value="de">Deutsch</option>
+                        </select>
+                    </div>
 
-                        <script>
-                            document.getElementById('language-select').addEventListener("change", function (ev) {
-                                Alpine.store('language').currentLanguage = this.value;
-                            });
-                        </script>
+                    <script>
+                        document.getElementById('language-select').addEventListener("change", function (ev) {
+                            Alpine.store('language').currentLanguage = this.value;
+                        });
+                    </script>
 
-                        <div class="float-start col-md-1 p-1">
-                            <button class="alert btn btn-primary w-100"
-                                x-on:click="$store.controls.showAuthModal = true;" x-text="trans('authenticate')">
-                            </button>
-                        </div>
+                    <div class="float-start col-sm p-1">
+                        <button class="alert btn btn-primary w-100" x-on:click="$store.controls.showAuthModal = true;"
+                            x-text="trans('authenticate')">
+                        </button>
+                    </div>
 
-                        <div class="float-start col-md-2 p-1" x-show="$store.credentials.authenticated == 0">
-                            <div class="alert alert-dark info-message-dark w-100 text-center"
-                                x-text="trans('auth_pending')">
-                            </div>
+                    <div class="float-start col-sm p-1" x-show="$store.credentials.authenticated == 0">
+                        <div class="alert alert-dark info-message-dark w-100 text-center"
+                            x-text="trans('auth_pending')">
                         </div>
+                    </div>
 
-                        <div class="float-start col-md-2 p-1" x-show="$store.credentials.authenticated == 1">
-                            <div class="alert alert-danger w-100 text-center"
-                                x-text="trans('auth_credentials_incorrect')">
-                            </div>
+                    <div class="float-start col-sm p-1" x-show="$store.credentials.authenticated == 1">
+                        <div class="alert alert-danger w-100 text-center" x-text="trans('auth_credentials_incorrect')">
                         </div>
+                    </div>
 
-                        <div class="float-start col-md-2 p-1" x-show="$store.credentials.authenticated == 2">
-                            <div class="alert alert-dark info-message-dark w-100 text-center"
-                                x-text="trans('auth_successful')">
-                            </div>
+                    <div class="float-start col-sm p-1" x-show="$store.credentials.authenticated == 2">
+                        <div class="alert alert-dark info-message-dark w-100 text-center"
+                            x-text="trans('auth_successful')">
                         </div>
+                    </div>
 
-                        <div class="float-start col-md-2 p-1">
-                            <button class="alert btn btn-primary w-100"
-                                :class="$store.controls.showPage==0 ?'btn-selected' : '' "
-                                x-on:click="$store.controls.showPage=0" x-text="trans('page_logging')">
-                            </button>
-                        </div>
+                    <div class="float-start col-sm p-1">
+                        <button class="alert btn btn-primary w-100"
+                            :class="$store.controls.showPage==0 ?'btn-selected' : '' "
+                            x-on:click="$store.controls.showPage=0" x-text="trans('page_logging')">
+                        </button>
+                    </div>
 
-                        <div class="float-start col-md-2 p-1">
-                            <button class="alert btn btn-primary w-100"
-                                :class="$store.controls.showPage==1 ?'btn-selected' : '' "
-                                x-on:click="$store.controls.showPage=1" x-text="trans('page_metrics')">
-                            </button>
-                        </div>
+                    <div class="float-start col-sm p-1">
+                        <button class="alert btn btn-primary w-100"
+                            :class="$store.controls.showPage==1 ?'btn-selected' : '' "
+                            x-on:click="$store.controls.showPage=1" x-text="trans('page_metrics')">
+                        </button>
+                    </div>
 
-                        <div class="float-start col-md-2 p-1">
-                            <button class="alert btn btn-primary w-100"
-                                :class="$store.controls.showPage==2 ?'btn-selected' : '' "
-                                x-on:click="$store.controls.showPage=2" x-text="trans('page_triggers')">
-                            </button>
-                        </div>
+                    <div class="float-start col-sm p-1">
+                        <button class="alert btn btn-primary w-100"
+                            :class="$store.controls.showPage==2 ?'btn-selected' : '' "
+                            x-on:click="$store.controls.showPage=2" x-text="trans('page_triggers')">
+                        </button>
+                    </div>
 
-                        <div class="float-start col-md-2 p-1">
-                            <button class="alert btn btn-primary w-100"
-                                :class="$store.controls.showPage==3 ?'btn-selected' : '' "
-                                x-on:click="$store.controls.showPage=3" x-text="trans('page_trigger_messages')">
-                            </button>
-                        </div>
+                    <div class="float-start col-sm p-1">
+                        <button class="alert btn btn-primary w-100"
+                            :class="$store.controls.showPage==3 ?'btn-selected' : '' "
+                            x-on:click="$store.controls.showPage=3" x-text="trans('page_trigger_messages')">
+                        </button>
                     </div>
                     <div class=" row mt-2">
 

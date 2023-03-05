@@ -273,8 +273,9 @@ async function syncCharts() {
             for (let metric of Object.keys(metricsCompiled[server])) {
                 let element = document.getElementById(server + ':' + metric);
                 let chartName = server + ' - ' + _global.trans('metrics_' + metric, 'en');
+                let chartTitle = server + ' - ' + _global.trans('metrics_' + metric, 'en');
                 if (element)
-                    makeOrUpdateChart(metricsCompiled[server][metric], chartName, metricsCompiledLabels[server][metric], element);
+                    makeOrUpdateChart(metricsCompiled[server][metric], chartName, chartTitle, metricsCompiledLabels[server][metric], element);
             }
         }
         await new Promise(resolve => setTimeout(resolve, 10));
@@ -291,7 +292,7 @@ let chartScaleLayout = {
         color: '#888'
     }
 };
-function makeOrUpdateChart(chartData, chartName, chartLabels, element) {
+function makeOrUpdateChart(chartData, chartName, chartTitle, chartLabels, element) {
     if (charts[chartName] == undefined) {
         let context = element.getContext('2d');
         let chart = new Chart(context, {
@@ -299,7 +300,7 @@ function makeOrUpdateChart(chartData, chartName, chartLabels, element) {
             data: {
                 labels: chartLabels,
                 datasets: [{
-                        label: chartName,
+                        label: chartTitle,
                         data: chartData,
                         fill: true,
                         backgroundColor: '#07429b',

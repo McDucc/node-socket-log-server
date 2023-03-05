@@ -65,7 +65,7 @@ function initializeTranslation(currentLanguage: string = 'en') {
             triggers_type_lt: 'Lower',
         },
         de: {
-            page_logging: 'Nachrichten',
+            page_logging: 'Logging',
             page_metrics: 'Metriken',
             page_trigger_messages: 'Trigger-Nachrichten',
             page_triggers: 'Trigger',
