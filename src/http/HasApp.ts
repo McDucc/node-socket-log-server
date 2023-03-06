@@ -10,6 +10,8 @@ export default class HasApp {
 
     protected app: TemplatedApp;
 
+    public address: string = '';
+
     constructor(public port: number) {
 
         process.on('uncaughtException', function (err) {
@@ -29,6 +31,8 @@ export default class HasApp {
 
     startListening() {
         this.app.listen(Environment.host, this.port, (listenSocket) => {
+            this.address = `${Environment.host}:${this.port}`;
+
             if (listenSocket) {
                 SharedService.log(`${this.constructor.name} is listening on ${Environment.host}:${this.port}`)
             } else {

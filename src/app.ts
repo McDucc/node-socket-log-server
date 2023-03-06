@@ -1,4 +1,4 @@
-import FrontEndcontroller from './services/FrontendService';
+import FrontendService from './services/FrontendService';
 import LogService from './services/LogService';
 import cluster, { Worker } from 'cluster';
 import TriggerService from './services/TriggerService';
@@ -32,7 +32,7 @@ if (cluster.isPrimary) {
     if (process.env.type === 'log') {
         new LogService();
     } else if (process.env.type === 'frontend') {
-        new FrontEndcontroller();
+        new FrontendService();
     } else if (process.env.type === 'triggers') {
         new TriggerService();
     }

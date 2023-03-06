@@ -18,7 +18,8 @@
     "copyfiles": "^2.4.1"
   },
   "scripts": {
-    "start": "tsc --build --force && copyfiles -u 1 src/**/*.{html,ico,css,js,map} build/ && node build/app.js",
-    "test": ""
+    "build": "tsc --build --force && copyfiles -u 1 src/**/*.{html,ico,css,js,map} build/",
+    "start": "npm run build && node build/app.js --no-warnings",
+    "test": "npm run build && node build/test.js --experimental-test-coverage --test-reporter=tap"
   }
 }

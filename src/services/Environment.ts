@@ -1,6 +1,8 @@
 import * as fs from 'fs';
 import SharedService from './SharedService';
 
-export const Environment = JSON.parse(fs.readFileSync('env.json').toString());
+let environmentFile = fs.readFileSync('.env').toString();
 
-SharedService.log(`Environment file read`);
+export const Environment = JSON.parse(fs.readFileSync(environmentFile).toString());
+
+SharedService.log(`Environment file ${environmentFile} read`);
