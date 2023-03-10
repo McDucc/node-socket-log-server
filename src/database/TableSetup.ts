@@ -1,14 +1,7 @@
 import Postgres from 'postgres';
 import { Environment } from '../services/Environment';
 import SharedService from '../services/SharedService';
-export default async function c(pool: Postgres): Promise<boolean> {
-
-    //Temporary sleep to prevent conflicts with the pg pool startup
-    await new Promise((res) => {
-        setTimeout(() => {
-            res(true)
-        }, 2500)
-    });
+export default async function TableSetup(pool: Postgres): Promise<boolean> {
 
     let table_columns: { column_name: string }[] = await pool.query('table-info',
         `SELECT column_name FROM information_schema.columns

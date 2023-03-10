@@ -8,16 +8,13 @@ import Templater from "template-engine";
 
 export default class TriggerService {
 
-    postgresPool: Postgres;
-
     triggers: Trigger[] = [];
 
     mailer: MailService | undefined = undefined;
 
     metrics: string[] = ['errors', 'logs', 'cpu', 'mem_used', 'disk_used', 'io_read', 'io_write', 'net_in', 'net_out', 'error_rate'];
 
-    constructor() {
-        this.postgresPool = SetupPostgresPool(Environment.postgres.threads.triggers);
+    constructor(private postgresPool: Postgres) {
 
         setTimeout(() => { this.loadTriggers() }, Environment.trigger_reload_time);
         setTimeout(() => { this.checkTriggers() }, Environment.trigger_execution_time);
@@ -128,7 +125,6 @@ export default class TriggerService {
     async getServerArray(): Promise<string[]> {
         return await SharedService.getServerArray(this.postgresPool);
     }
-
 
     readonly triggerMessageExistsName = 'trigger-message-exists';
     readonly triggerMessageExistsQuery = 'SELECT COUNT(*) as count FROM trigger_messages WHERE trigger_id = $1 AND time BETWEEN $2 AND $3 AND server = $4';

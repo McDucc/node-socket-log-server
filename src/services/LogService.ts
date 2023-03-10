@@ -10,8 +10,6 @@ import SharedService from './SharedService';
 
 export default class LogService extends HasApp {
 
-    postgresPool: Postgres;
-
     writeLogQueryName = 'write-log';
     writeLogQueryText = `INSERT INTO ${Environment.postgres.logs_table} (level,time,channel,message,server,data) VALUES ($1,$2,$3,$4,$5,$6)`
 
@@ -19,13 +17,9 @@ export default class LogService extends HasApp {
     writeMetricsQueryText = `INSERT INTO ${Environment.postgres.metrics_table} 
            (time,server,cpu,mem_used,io_read,io_write,disk_used,net_in,net_out)
     VALUES ($1  ,$2    ,$3 ,$4      ,$5     ,$6      ,$7       ,$8    ,$9)`
-    constructor() {
+    constructor(private postgresPool: Postgres) {
 
         super(Environment.logger_port);
-
-        this.postgresPool = SetupPostgresPool(Environment.postgres.threads.log);
-
-        TableSetup(this.postgresPool);
 
         this.app.ws('/log', {
             idleTimeout: 32,
@@ -64,6 +58,11 @@ export default class LogService extends HasApp {
             }
         });
 
+    }
+
+    public async initialize() {
+        this.postgresPool = await SetupPostgresPool(Environment.postgres.threads.log);
+        await TableSetup(this.postgresPool);
         this.startListening();
     }
 
