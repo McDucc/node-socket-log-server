@@ -1,17 +1,19 @@
 {
   "compilerOptions": {
-    "target": "ES2018",
+    "target": "es2017",
     "module": "commonjs",
     "lib": [
       "ES2018",
       "DOM"
     ],
     "moduleResolution": "node",
-    "allowJs": true,
-    "outDir": "build",
-    "removeComments": true,
-    "rootDir": "src",
     "strict": true,
+    "allowJs": true,
+    "declaration": true,
+    "declarationMap": true,
+    "removeComments": true,
+    "outDir": "build",
+    "rootDir": "src",
     "noImplicitAny": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
@@ -19,7 +21,8 @@
     "emitDecoratorMetadata": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    "incremental": true,
     "allowUnreachableCode": true,
+    "downlevelIteration": true,
+    "incremental": true,
   }
 }

@@ -24,15 +24,12 @@
   },
   "pkg": {
     "scripts": "build/**/*.js",
-    "assets": [
-      "node_modules/**/*",
-      "build/**/*"
-    ],
     "targets": [
       "node18-linux-x64",
       "node18-macos-x64",
       "node18-win-x64"
     ],
     "outputPath": "dist"
-  }
+  },
+  "bin": "./build/app.js"
 }
