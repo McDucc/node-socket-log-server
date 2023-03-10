@@ -10,7 +10,7 @@
     "mail-service": "github:gudatr/node-mail-service",
     "postgres": "gudatr/postgres-pool",
     "template-engine": "github:gudatr/node-template-engine",
-    "uWebSockets.js": "uNetworking/uWebSockets.js#v20.16.0"
+    "uWebSockets.js": "uNetworking/uWebSockets.js#v20.13.0"
   },
   "devDependencies": {
     "@types/node": "^18.11.18",
