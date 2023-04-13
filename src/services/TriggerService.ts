@@ -1,4 +1,4 @@
-import Postgres from "postgres";
+import Postgres from "pg-pool-minimal";
 import Trigger from '../database/models/Trigger';
 import SetupPostgresPool from "../database/PostgresSetup";
 import { Environment } from "./Environment";

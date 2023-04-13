@@ -1,4 +1,4 @@
-import Postgres from "postgres";
+import Postgres from "pg-pool-minimal";
 import { Environment } from "../services/Environment";
 
 export default async function SetupPostgresPool(threads: number) {
@@ -12,7 +12,8 @@ export default async function SetupPostgresPool(threads: number) {
         password: Environment.postgres.password,
         threads,
         queueSize: 65536,
-        escapeChar: '\\'
+        escapeChar: '\\',
+        valuesOnly: false
     });
 
     await pool.initialize();

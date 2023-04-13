@@ -1,4 +1,4 @@
-import Postgres from "postgres";
+import Postgres from "pg-pool-minimal";
 
 export default class SharedService {
 

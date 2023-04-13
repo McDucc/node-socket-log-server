@@ -1,4 +1,4 @@
-import Postgres from 'postgres';
+import Postgres from "pg-pool-minimal";
 import { Environment } from '../services/Environment';
 import SharedService from '../services/SharedService';
 export default async function TableSetup(pool: Postgres): Promise<boolean> {

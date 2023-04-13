@@ -2,7 +2,7 @@ import HasApp from '../http/HasApp';
 import { Environment } from './Environment';
 import { DEDICATED_COMPRESSOR_16KB } from 'uWebSockets.js';
 import { URLSearchParams } from 'url';
-import Postgres from 'postgres';
+import Postgres from "pg-pool-minimal";
 import SetupPostgresPool from '../database/PostgresSetup';
 import TableSetup from '../database/TableSetup';
 import SharedService from './SharedService';

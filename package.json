@@ -8,7 +8,7 @@
   "license": "MIT",
   "dependencies": {
     "mail-service": "github:gudatr/node-mail-service",
-    "postgres": "gudatr/postgres-pool",
+    "pg-pool-minimal": "^1.2.0",
     "template-engine": "github:gudatr/node-template-engine",
     "uWebSockets.js": "uNetworking/uWebSockets.js#v20.13.0"
   },

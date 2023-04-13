@@ -216,7 +216,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.store('controls', {
         datetime1: new Date().toISOString().substring(0, 19),
         datetime2: new Date().toISOString().substring(0, 19),
-        metrics: ['cpu', 'mem_used', 'disk_used', 'io_read', 'io_write', 'net_in', 'net_out', 'error_rate'],
+        metrics: ['cpu', 'mem_used', 'disk_used', 'io_read', 'io_write', 'net_in', 'net_out', 'error_rate', 'message_rate'],
         showAuthModal: true,
         showTriggerModal: false,
         trigger_edit: {

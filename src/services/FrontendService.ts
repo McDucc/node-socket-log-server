@@ -2,7 +2,7 @@ import RequestData from '../http/RequestData';
 import { HttpResponse } from "uWebSockets.js";
 import HasApp from '../http/HasApp';
 import { Environment } from './Environment';
-import Postgres from 'postgres';
+import Postgres from "pg-pool-minimal";
 import SetupPostgresPool from '../database/PostgresSetup';
 import SharedService from './SharedService';
 
@@ -233,6 +233,7 @@ export default class FrontendService extends HasApp {
     ROUND(AVG(net_in)::numeric,3) AS net_in,
     ROUND(AVG(net_out)::numeric,3) AS net_out,
     0 AS error_rate,
+    0 AS message_rate,
     FLOOR((time - $1 + 0.00001) / ($2::numeric - $1) * $3) as slice FROM ${Environment.postgres.metrics_table} WHERE
     time BETWEEN $1 AND $2
     GROUP BY slice, server
@@ -249,18 +250,35 @@ export default class FrontendService extends HasApp {
     GROUP BY slice, server
     ORDER BY slice`;
 
+    messageRateQueryName = 'message-rate';
+    messageRateQuery = `SELECT
+    server,
+    COUNT(*) as message_rate,
+    FLOOR((time - $1 + 0.00001) / ($2::numeric - $1) * $3) as slice
+    FROM logs WHERE
+    time BETWEEN $1 AND $2
+    GROUP BY slice, server
+    ORDER BY slice`;
+
     async metricsLookup(
         minimumTime: number,
         maximumTime: number,
         resolution: number = 30): Promise<MetricsResult> {
 
-        let data = await this.postgresPool.query(this.metricsQueryName, this.metricsQuery, [minimumTime, maximumTime, resolution]);
-        let errorRate = await this.postgresPool.query(this.errorRateQueryName, this.errorRateQuery, [minimumTime, maximumTime, resolution, Environment.error_rate_level])
+        let [data, errorRate, messageRate] = await Promise.all([
+            this.postgresPool.query(this.metricsQueryName, this.metricsQuery, [minimumTime, maximumTime, resolution]),
+            this.postgresPool.query(this.errorRateQueryName, this.errorRateQuery, [minimumTime, maximumTime, resolution, Environment.error_rate_level]),
+            this.postgresPool.query(this.messageRateQueryName, this.messageRateQuery, [minimumTime, maximumTime, resolution])]);
 
         data.forEach(dataElement => {
             errorRate.forEach(errorRateElement => {
                 if (dataElement.slice == errorRateElement.slice && dataElement.server == errorRateElement.server) {
                     return dataElement.error_rate = errorRateElement.error_rate;
+                }
+            });
+            messageRate.forEach(messageRateElement => {
+                if (dataElement.slice == messageRateElement.slice && dataElement.server == messageRateElement.server) {
+                    return dataElement.message_rate = messageRateElement.message_rate;
                 }
             });
         });
