@@ -1,11 +1,11 @@
 export default class Trigger {
-    id: number = 0;
-    name: string = '';
-    description: string = '';
-    type: string = '';
-    value: string = '';
-    active: boolean = true;
-    send_mails: boolean = true;
-    threshold: number = 0;
-    time: number = 0;
+    id!: number;
+    name!: string;
+    description!: string;
+    type!: string;
+    value!: string;
+    active!: boolean;
+    send_mails!: boolean;
+    threshold!: number;
+    time!: number;
 }
