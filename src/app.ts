@@ -35,22 +35,14 @@ async function app() {
     } else {
 
         if (process.env.type === 'log') {
-
-            let pool = await SetupPostgresPool(Environment.postgres.threads.log);
-            let service = new LogService(pool);
+            let service = new LogService();
             service.initialize();
-
         } else if (process.env.type === 'frontend') {
-
-            let pool = await SetupPostgresPool(Environment.postgres.threads.frontend);
-            let service = new FrontendService(pool);
+            let service = new FrontendService();
             service.initialize();
-
         } else if (process.env.type === 'triggers') {
-
             let pool = await SetupPostgresPool(Environment.postgres.threads.triggers);
-            let service = new TriggerService(pool);
-
+            new TriggerService(pool);
         }
     }
 }

@@ -7,17 +7,19 @@ import SetupPostgresPool from '../database/PostgresSetup';
 import TableSetup from '../database/TableSetup';
 import SharedService from './SharedService';
 
+const writeLogQueryName = 'write-log';
+const writeLogQueryText = `INSERT INTO ${Environment.postgres.logs_table} (level,time,channel,message,server,data) VALUES ($1,$2,$3,$4,$5,$6)`
+
+const writeMetricsQueryName = 'write-metric';
+const writeMetricsQueryText = `INSERT INTO ${Environment.postgres.metrics_table} 
+           (time,server,cpu,mem_used,io_read,io_write,disk_used,net_in,net_out)
+    VALUES ($1  ,$2    ,$3 ,$4      ,$5     ,$6      ,$7       ,$8    ,$9)`
 
 export default class LogService extends HasApp {
 
-    writeLogQueryName = 'write-log';
-    writeLogQueryText = `INSERT INTO ${Environment.postgres.logs_table} (level,time,channel,message,server,data) VALUES ($1,$2,$3,$4,$5,$6)`
+    private postgresPool!: Postgres
 
-    writeMetricsQueryName = 'write-metric';
-    writeMetricsQueryText = `INSERT INTO ${Environment.postgres.metrics_table} 
-           (time,server,cpu,mem_used,io_read,io_write,disk_used,net_in,net_out)
-    VALUES ($1  ,$2    ,$3 ,$4      ,$5     ,$6      ,$7       ,$8    ,$9)`
-    constructor(private postgresPool: Postgres) {
+    constructor() {
 
         super(Environment.logger_port);
 
@@ -92,13 +94,12 @@ export default class LogService extends HasApp {
     }
 
     writeLog(level: number, channel: string, message: string, server: string, data: string) {
-        if (typeof data !== 'string') { data = JSON.stringify(data); }
-        this.postgresPool.query(this.writeLogQueryName, this.writeLogQueryText, [level, Date.now(), channel, message, server, data])
+        this.postgresPool.query(writeLogQueryName, writeLogQueryText, [level, Date.now(), channel, message, server, data])
     }
 
     writeMetrics(server: string, cpu: number, mem_used: number, io_read: number, io_write: number,
         disk_used: number, net_in: number, net_out: number) {
         let array = [Date.now(), server, cpu, mem_used, io_read, io_write, disk_used, net_in, net_out];
-        this.postgresPool.query(this.writeMetricsQueryName, this.writeMetricsQueryText, array)
+        this.postgresPool.query(writeMetricsQueryName, writeMetricsQueryText, array)
     }
 }

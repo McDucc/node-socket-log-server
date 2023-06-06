@@ -8,11 +8,13 @@ import SharedService from './SharedService';
 
 export default class FrontendService extends HasApp {
 
+    private postgresPool!: Postgres
+
     //The search function is limited since it can be pretty intense for the server
     searchLockLimit = Environment.search_limit;
     searchLock = 0;
 
-    constructor(private postgresPool: Postgres) {
+    constructor() {
         super(Environment.frontend_port);
 
         this.bind('post', '/search', this.search);
