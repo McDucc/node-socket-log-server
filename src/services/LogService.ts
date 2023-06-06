@@ -46,9 +46,34 @@ export default class LogService extends HasApp {
             },
 
             message: (ws, message) => {
-                try {
-                    this.log(JSON.parse(Buffer.from(message).toString()), ws.name);
-                } catch { }
+                let messageBuffer = Buffer.from(message);
+
+                if (messageBuffer[0] === 0) {
+                    this.writeMetrics(ws.name,
+                        messageBuffer.readFloatBE(1),
+                        messageBuffer.readFloatBE(5),
+                        messageBuffer.readFloatBE(9),
+                        messageBuffer.readFloatBE(13),
+                        messageBuffer.readFloatBE(17),
+                        messageBuffer.readFloatBE(21),
+                        messageBuffer.readFloatBE(25));
+                } else {
+                    let messageString = messageBuffer.toString();
+                    let channelIndex = messageString.indexOf("'");
+                    let channel = messageString.substring(1, channelIndex++);
+                    let messageIndex = messageString.indexOf("'", channelIndex);
+                    let message: string;
+                    let data: string;
+                    if (messageIndex === -1) {
+                        message = messageString.substring(channelIndex);
+                        data = '';
+                    } else {
+                        message = messageString.substring(channelIndex, messageIndex);
+                        data = messageString.substring(messageIndex + 1);
+                    }
+
+                    this.writeLog(messageString.charCodeAt(0), channel, message, ws.name, data);
+                }
             },
 
             drain: (_ws) => { },
@@ -66,15 +91,6 @@ export default class LogService extends HasApp {
         this.startListening();
     }
 
-    log(message: IncomingData, server: string) {
-        if (!message.channel) {
-            this.writeMetrics(server, message.cpu, message.mem_used, message.io_read,
-                message.io_write, message.disk_used, message.net_in, message.net_out);
-        } else {
-            this.writeLog(message.level, message.channel, message.message, server, message.data);
-        }
-    }
-
     writeLog(level: number, channel: string, message: string, server: string, data: string) {
         if (typeof data !== 'string') { data = JSON.stringify(data); }
         this.postgresPool.query(this.writeLogQueryName, this.writeLogQueryText, [level, Date.now(), channel, message, server, data])
@@ -85,18 +101,4 @@ export default class LogService extends HasApp {
         let array = [Date.now(), server, cpu, mem_used, io_read, io_write, disk_used, net_in, net_out];
         this.postgresPool.query(this.writeMetricsQueryName, this.writeMetricsQueryText, array)
     }
-}
-
-class IncomingData {
-    level: number = 0;
-    channel: string = '';
-    message: string = '';
-    data: string = '';
-    cpu: number = 0;
-    mem_used: number = 0;
-    io_read: number = 0;
-    io_write: number = 0;
-    disk_used: number = 0;
-    net_in: number = 0;
-    net_out: number = 0;
 }
