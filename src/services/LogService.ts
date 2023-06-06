@@ -72,7 +72,7 @@ export default class LogService extends HasApp {
                         data = messageString.substring(messageIndex + 1);
                     }
 
-                    this.writeLog(messageString.charCodeAt(0), channel, message, ws.name, data);
+                    this.writeLog(~~messageString[0], channel, message, ws.name, data);
                 }
             },
 
